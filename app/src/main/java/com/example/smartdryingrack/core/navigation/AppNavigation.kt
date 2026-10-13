@@ -79,7 +79,7 @@ import com.example.smartdryingrack.feature.settings.SettingsRoute
 enum class Destination(val route: String, @StringRes val label: Int, val icon: ImageVector) {
     HOME("home", R.string.nav_home, Icons.Outlined.Home),
     CONTROL("control", R.string.nav_control, Icons.Outlined.Tune),
-    ALERTS("alerts", R.string.nav_alerts, Icons.Outlined.Notifications),
+    ALERTS("alerts", R.string.nav_alerts, Icons.Outlined.WarningAmber),
     HISTORY("history", R.string.nav_history, Icons.Outlined.BarChart)
 }
 
@@ -100,22 +100,22 @@ fun SmartDryingRackRoot(viewModel: SettingsViewModel = hiltViewModel()) {
             }
         }
     }
-    val initialRoute = remember { if (viewModel.address.value.isBlank()) "device_setup" else "home" }
+    val initialRoute = remember { if (viewModel.address.value.isBlank()) "welcome" else "home" }
     SmartDryingRackTheme(darkTheme = settings.darkTheme) {
         val nav = rememberNavController()
         val backStack by nav.currentBackStackEntryAsState()
         val current = backStack?.destination?.route
 
-        val showBottomBar = current in Destination.entries.map { it.route } || current in listOf("settings", "notifications")
-        val showTopBar = showBottomBar
+        val showBottomBar = current in Destination.entries.map { it.route }
+        val showTopBar = current in Destination.entries.map { it.route } || current == "settings"
 
         Scaffold(
             containerColor = AppColors.Background,
             topBar = {
                 if (showTopBar) {
                     TopAppBar(
-                        title = { Text("Smart Drying Rack", color = AppColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp) },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = AppColors.BackgroundAlt),
+                        title = { Text(when (current) { "history" -> "History"; "settings" -> "Settings"; else -> "Smart Drying Rack" }, color = AppColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = AppColors.Background),
                         actions = {
                             IconButton(onClick = { nav.navigate("notifications") { launchSingleTop = true } }) {
                                 BadgedBox(badge = { if (unread > 0) Badge { Text(if (unread > 99) "99+" else unread.toString()) } }) {
@@ -123,7 +123,7 @@ fun SmartDryingRackRoot(viewModel: SettingsViewModel = hiltViewModel()) {
                                 }
                             }
                             IconButton(onClick = { nav.navigate("settings") { launchSingleTop = true } }) {
-                                Icon(Icons.Default.Settings, contentDescription = "Settings", tint = if (current == "settings") AppColors.Primary else AppColors.TextPrimary)
+                                Icon(Icons.Outlined.Settings, contentDescription = "Settings", tint = if (current == "settings") AppColors.Primary else AppColors.TextPrimary)
                             }
                         }
                     )
@@ -206,7 +206,7 @@ fun SmartDryingRackRoot(viewModel: SettingsViewModel = hiltViewModel()) {
 
 @Composable
 private fun NeonNavigation(current: String?, onNavigate: (Destination) -> Unit) {
-    val shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)
+    val shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     val cyan = AppColors.Primary
     Row(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(AppColors.Card, AppColors.Background)))
         .border(1.dp, cyan.copy(alpha = .24f), shape).navigationBarsPadding().padding(horizontal = 8.dp, vertical = 6.dp)) {
@@ -216,7 +216,7 @@ private fun NeonNavigation(current: String?, onNavigate: (Destination) -> Unit) 
             val destinationLabel = stringResource(destination.label)
             Column(Modifier.weight(1f).heightIn(min = 56.dp)
                 .clip(RoundedCornerShape(14.dp))
-                .background(if (selected) cyan.copy(alpha = .14f) else androidx.compose.ui.graphics.Color.Transparent)
+                .background(if (selected) androidx.compose.ui.graphics.Color.Transparent else androidx.compose.ui.graphics.Color.Transparent)
                 .selectable(selected, role = Role.Tab, onClick = { onNavigate(destination) })
                 .semantics(mergeDescendants = true) {
                     contentDescription = destinationLabel

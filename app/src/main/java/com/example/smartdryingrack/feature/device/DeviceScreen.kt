@@ -8,6 +8,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
@@ -53,13 +54,15 @@ fun DeviceConnectionPanel(viewModel: DeviceViewModel = hiltViewModel()) {
         )
         message?.let { Text(it, color = if (connection == ConnectionState.ERROR) AppColors.Danger else AppColors.TextSecondary) }
         Spacer(Modifier.height(12.dp))
-        Button(onClick = { focus.clearFocus(); viewModel.connect(address) }, enabled = address.isNotBlank() && connection != ConnectionState.CONNECTING,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+        NeonAction(if (connection == ConnectionState.CONNECTING) "Connecting…" else "Connect", androidx.compose.material.icons.Icons.Outlined.Wifi,
+            onClick = { focus.clearFocus(); viewModel.connect(address) }, enabled = address.isNotBlank() && connection != ConnectionState.CONNECTING,
+            modifier = Modifier.fillMaxWidth())
+        /* Connection progress is announced by StatusIndicator above. */
+        if (connection == ConnectionState.CONNECTING) {
             if (connection == ConnectionState.CONNECTING) {
                 CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
                 Spacer(Modifier.width(8.dp))
             }
-            Text(if (connection == ConnectionState.CONNECTING) "Connecting…" else "Save and connect")
         }
         if (connection != ConnectionState.OFFLINE) {
             OutlinedButton(onClick = viewModel::disconnect, modifier = Modifier.fillMaxWidth()) { Text("Disconnect") }

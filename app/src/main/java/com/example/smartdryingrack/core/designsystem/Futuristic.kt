@@ -32,28 +32,18 @@ import com.example.smartdryingrack.domain.model.RackState
 
 @Composable
 fun CircuitBackground(modifier: Modifier = Modifier) {
-    val dark = LocalDarkTheme.current
-    val line = AppColors.Primary.copy(alpha = if (dark) .07f else .045f)
-    val base = AppColors.Background
-    val alternate = AppColors.BackgroundAlt
-    Canvas(modifier.fillMaxSize().background(Brush.verticalGradient(listOf(alternate, base)))) {
-        val step = 38.dp.toPx()
-        var x = 0f
-        while (x <= size.width) { drawLine(line, Offset(x, 0f), Offset(x, size.height), .5.dp.toPx()); x += step }
-        var y = 0f
-        while (y <= size.height) { drawLine(line, Offset(0f, y), Offset(size.width, y), .5.dp.toPx()); y += step }
-        val glow = line.copy(alpha = if (dark) .22f else .1f)
-        val bottom = size.height * .82f
-        drawLine(glow, Offset(0f, bottom), Offset(size.width * .55f, bottom + 64.dp.toPx()), 1.dp.toPx())
-        drawLine(glow, Offset(size.width * .55f, bottom + 64.dp.toPx()), Offset(size.width, bottom - 8.dp.toPx()), 1.dp.toPx())
+    Box(modifier.fillMaxSize().background(AppColors.Background)) {
+        if (LocalDarkTheme.current) {
+            ReferenceArtwork(R.drawable.reference_welcome, 1610, 1810, Modifier.fillMaxSize())
+        }
     }
 }
 
 @Composable
 fun NeonIcon(icon: ImageVector, color: Color = AppColors.Primary, modifier: Modifier = Modifier) {
-    Box(modifier.size(42.dp).clip(RoundedCornerShape(13.dp))
+    Box(modifier.size(36.dp).clip(RoundedCornerShape(10.dp))
         .background(Brush.radialGradient(listOf(color.copy(alpha = .28f), color.copy(alpha = .04f))))
-        .border(1.dp, color.copy(alpha = .25f), RoundedCornerShape(13.dp)), contentAlignment = Alignment.Center) {
+        .border(1.dp, color.copy(alpha = .25f), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
         Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(25.dp))
     }
 }
@@ -86,21 +76,13 @@ fun DeviceConnectionCard(connection: ConnectionState, onClick: () -> Unit) {
 
 @Composable
 fun RackHero(state: RackState, modifier: Modifier = Modifier, showPosition: Boolean = true) {
-    val shape = RoundedCornerShape(18.dp)
-    val base = AppColors.Background
     BoxWithConstraints(modifier.fillMaxWidth()) {
-        val height = (maxWidth * .65f).coerceIn(200.dp, 280.dp) + if (showPosition) 24.dp else 0.dp
-        Box(Modifier.fillMaxWidth().height(height).clip(shape).border(1.dp, AppColors.BorderSubtle, shape)) {
-            Image(painterResource(R.drawable.rack_scene), contentDescription = "Illustration of a motorized drying rack with hanging laundry",
-                modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent, base))))
-            Box(Modifier.align(Alignment.TopEnd).padding(10.dp).clip(RoundedCornerShape(8.dp))
-                .background(Color(0xB3040C16)).padding(horizontal = 8.dp, vertical = 4.dp)) {
-                Text("RACK ILLUSTRATION", color = Color(0xFFB2C6E3), style = MaterialTheme.typography.labelSmall)
-            }
+        val height = maxWidth * .77f
+        Box(Modifier.fillMaxWidth().height(height + if (showPosition) 26.dp else 0.dp)) {
+            ReferenceRack(Modifier.fillMaxWidth().height(height))
             if (showPosition) {
-                Text(stringResource(state.labelRes()), modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
-                    style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
+                Text(stringResource(state.labelRes()), modifier = Modifier.align(Alignment.BottomCenter).padding(4.dp),
+                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
             }
         }
     }
@@ -109,18 +91,20 @@ fun RackHero(state: RackState, modifier: Modifier = Modifier, showPosition: Bool
 @Composable
 fun NeonAction(label: String, icon: ImageVector, onClick: () -> Unit, enabled: Boolean = true,
                modifier: Modifier = Modifier, accent: Color = AppColors.Primary) {
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(8.dp)
     val activeColor = if (enabled) accent else AppColors.Border
-    Box(modifier.heightIn(min = 52.dp)
+    Box(modifier.heightIn(min = 48.dp)
         .shadow(if (enabled && LocalDarkTheme.current) 9.dp else 0.dp, shape, ambientColor = activeColor, spotColor = activeColor)
         .clip(shape)
-        .background(Brush.linearGradient(listOf(activeColor.copy(alpha = if (enabled) .42f else .16f), activeColor.copy(alpha = .12f))))
+        .background(Brush.verticalGradient(if (enabled) listOf(activeColor, Color(0xFF007EA6), Color(0xFF003C63), activeColor.copy(alpha = .85f)) else listOf(AppColors.Card, AppColors.Card)))
         .border(1.dp, activeColor, shape)
         .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
         .padding(horizontal = 10.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(icon, contentDescription = null, tint = if (enabled) accent else AppColors.TextTertiary)
+            val trailing = icon == Icons.Outlined.ArrowForward
+            if (!trailing) Icon(icon, contentDescription = null, tint = if (enabled) Color.White else AppColors.TextTertiary)
             Text(label, color = if (enabled) AppColors.TextPrimary else AppColors.TextTertiary, fontWeight = FontWeight.Bold)
+            if (trailing) Icon(icon, contentDescription = null, tint = if (enabled) Color.White else AppColors.TextTertiary)
         }
     }
 }
@@ -173,9 +157,9 @@ fun EmptyStateCard(title: String, message: String, icon: ImageVector,
 
 @Composable
 fun MovementAction(label: String, icon: ImageVector, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(10.dp)
     val accent = if (enabled) AppColors.Primary else AppColors.Border
-    Column(modifier.heightIn(min = 88.dp).clip(shape)
+    Column(modifier.heightIn(min = 78.dp).clip(shape)
         .background(Brush.verticalGradient(listOf(accent.copy(alpha = .26f), AppColors.Card)))
         .border(1.dp, accent.copy(alpha = if (enabled) .8f else .6f), shape)
         .clickable(enabled = enabled, role = Role.Button, onClick = onClick).padding(12.dp),
@@ -183,5 +167,26 @@ fun MovementAction(label: String, icon: ImageVector, enabled: Boolean, onClick: 
         Icon(icon, contentDescription = null, tint = if (enabled) AppColors.Primary else AppColors.TextTertiary, modifier = Modifier.size(30.dp))
         Text(label, color = if (enabled) AppColors.TextPrimary else AppColors.TextTertiary,
             fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+@Composable
+fun NeonToggleRow(title: String, description: String, icon: ImageVector, checked: Boolean,
+                  onChange: ((Boolean) -> Unit)? = null, enabled: Boolean = true) {
+    GlassCard(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            NeonIcon(icon)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
+            }
+            Switch(checked = checked, onCheckedChange = onChange, enabled = enabled,
+                colors = SwitchDefaults.colors(checkedTrackColor = AppColors.Primary,
+                    checkedThumbColor = Color.White, uncheckedTrackColor = AppColors.Card,
+                    uncheckedBorderColor = AppColors.Border,
+                    disabledCheckedTrackColor = AppColors.Primary.copy(alpha = .55f),
+                    disabledCheckedThumbColor = Color.White.copy(alpha = .85f)))
+        }
     }
 }

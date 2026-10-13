@@ -45,10 +45,10 @@ object AppColors {
 
 object DarkAppColors {
     // Dark Theme Palette (Primary Futuristic Smart-Home)
-    val Background = Color(0xFF040C16)
-    val BackgroundAlt = Color(0xFF071626)
-    val Card = Color(0xFF0C2032)
-    val CardAlt = Color(0xFF14263D)
+    val Background = Color(0xFF001020)
+    val BackgroundAlt = Color(0xFF001326)
+    val Card = Color(0xFF031C2D)
+    val CardAlt = Color(0xFF08283A)
     val ElevatedCard = Color(0xFF19314A)
     val Primary = Color(0xFF16E3F4) // Futuristic Electric Blue
     val PrimaryVariant = Color(0xFF00A9C8)

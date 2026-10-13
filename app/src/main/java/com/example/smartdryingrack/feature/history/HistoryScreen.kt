@@ -40,14 +40,14 @@ fun HistoryScreen(state: HistoryUiState) {
         else LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
     val points = state.temperatures.filter { it.timestamp >= start }
     ScreenColumn {
-        ScreenHeading("History", "Temperature trends and rack activity")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             NeonAction("Today", Icons.Outlined.Today, { week = false }, modifier = Modifier.weight(1f),
                 accent = if (!week) AppColors.Primary else AppColors.TextSecondary)
             NeonAction("Week", Icons.Outlined.DateRange, { week = true }, modifier = Modifier.weight(1f),
                 accent = if (week) AppColors.Primary else AppColors.TextSecondary)
         }
-        Text("Temperature trend (°C)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        RackHero(com.example.smartdryingrack.domain.model.RackState.UNKNOWN, showPosition = false)
+        Text("Temperature (°C)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         TemperatureChart(points)
         Text("Measurements are saved every five minutes while the app is connected.",
             style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)

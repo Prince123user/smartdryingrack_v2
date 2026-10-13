@@ -28,11 +28,11 @@ import java.io.File
 class NavigationRenderTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
-    private fun capture(name: String) {
+    private fun capture(name: String, heading: String = "Smart Drying Rack") {
         compose.mainClock.advanceTimeBy(500)
         compose.waitForIdle()
-        compose.onNodeWithText("Smart Drying Rack").assertIsDisplayed()
-        println("$name header bounds: " + compose.onNodeWithText("Smart Drying Rack").fetchSemanticsNode().boundsInRoot)
+        compose.onNode(hasText(heading) and !hasClickAction()).assertIsDisplayed()
+        println("$name header bounds: " + compose.onNode(hasText(heading) and !hasClickAction()).fetchSemanticsNode().boundsInRoot)
         // Draw the actual activity into a native Android canvas. PixelCopy callbacks are not
         // driven by Robolectric's paused main looper, so Compose captureToImage would time out.
         val image = compose.runOnIdle {
@@ -47,6 +47,18 @@ class NavigationRenderTest {
     }
 
     @Test fun appLaunchesAndEveryPrimaryNavigationRenders() {
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Get Started").fetchSemanticsNodes().isNotEmpty() }
+        capture("10-introduction", "SMART\nDRYING RACK")
+        compose.onNodeWithText("Get Started").performClick()
+        compose.onNodeWithText("Smart Monitoring").assertIsDisplayed()
+        compose.onNodeWithText("Illustrative readings").assertExists()
+        compose.onNodeWithText("Home").assertDoesNotExist()
+        capture("11-monitoring", "Smart Monitoring")
+        compose.onNodeWithText("Next").performClick()
+        compose.onNodeWithText("Rain Protection").assertIsDisplayed()
+        capture("12-rain-protection", "Rain Protection")
+        compose.onNodeWithText("Continue").performClick()
+        capture("13-connect-device", "Connect Device")
         compose.onNodeWithText("Explore offline").performScrollTo().performClick()
         compose.onNodeWithText("Connect your ESP32 rack").assertExists()
         compose.onNodeWithContentDescription("Illustration of a motorized drying rack with hanging laundry").assertExists()
@@ -61,22 +73,32 @@ class NavigationRenderTest {
         compose.onNodeWithText("Waiting for temperature history").assertExists()
         compose.onNodeWithText("Week").performClick()
         compose.onNodeWithText("Today").performClick()
-        capture("04-history")
+        capture("04-history", "History")
         compose.onNodeWithContentDescription("Notifications").performClick()
         compose.onNodeWithText("No notifications yet").assertExists()
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithContentDescription("Home").assertHasClickAction().performClick()
         compose.onNodeWithText("Connect your ESP32 rack").assertExists()
         compose.onNodeWithContentDescription("Notifications").performClick()
-        capture("05-notifications")
+        capture("05-notifications", "Notifications")
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithContentDescription("Settings").performClick()
         compose.onNodeWithText("ESP32 rack").assertExists()
-        capture("06-settings")
+        capture("06-settings", "Settings")
         compose.onNode(hasText("Appearance") and hasClickAction()).performScrollTo().performClick()
         compose.onNodeWithText("Midnight cyan").assertExists()
         compose.onNodeWithContentDescription("Back").performClick()
-        compose.onNode(hasText("Advanced settings") and hasClickAction()).performScrollTo().performClick()
+        compose.onNode(hasText("Device Settings") and hasClickAction()).performScrollTo().performClick()
         compose.onNodeWithText("Your rack").assertExists()
+        capture("14-device-settings", "Device Settings")
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNode(hasText("Notification Settings") and hasClickAction()).performScrollTo().performClick()
+        compose.onNodeWithText("Notification sound").assertExists()
+        capture("15-notification-settings", "Notification Settings")
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNode(hasText("Automation") and hasClickAction()).performScrollTo().performClick()
+        compose.onNodeWithText("Rain Sensor Sensitivity").assertExists()
+        capture("16-automation-settings", "Automation")
         compose.onNodeWithContentDescription("Back").performClick()
     }
     @Test fun largeTextLightDashboardKeepsConnectionActionAccessible() {

@@ -3,6 +3,7 @@ package com.example.smartdryingrack.feature.onboarding
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -21,9 +22,24 @@ import com.example.smartdryingrack.domain.model.ConnectionState
 @Composable
 fun DeviceSetupScreen(onFinishSetup: () -> Unit, viewModel: DeviceViewModel = hiltViewModel()) {
     val connection by viewModel.connection.collectAsStateWithLifecycle()
-    LaunchedEffect(connection) { if (connection == ConnectionState.ONLINE) onFinishSetup() }
+    if (connection == ConnectionState.ONLINE) {
+        val address by viewModel.address.collectAsStateWithLifecycle()
+        ScreenColumn {
+            Text("Device Connected", style = MaterialTheme.typography.headlineSmall,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+            androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.CheckCircle, null,
+                tint = AppColors.Primary, modifier = Modifier.fillMaxWidth().height(72.dp))
+            com.example.smartdryingrack.core.designsystem.RackHero(com.example.smartdryingrack.domain.model.RackState.UNKNOWN, showPosition = false)
+            Text("ESP32 Rack is now online!", style = MaterialTheme.typography.titleMedium)
+            com.example.smartdryingrack.core.designsystem.NeonFeatureRow("Wi-Fi REST connected", "Validated device telemetry received", androidx.compose.material.icons.Icons.Outlined.Wifi)
+            com.example.smartdryingrack.core.designsystem.NeonFeatureRow("Local IP address", address, androidx.compose.material.icons.Icons.Outlined.Lan)
+            com.example.smartdryingrack.core.designsystem.NeonAction("Open Home", androidx.compose.material.icons.Icons.Outlined.ArrowForward,
+                onFinishSetup, modifier = Modifier.fillMaxWidth())
+        }
+        return
+    }
     ScreenColumn {
-        Text("Connect device", style = MaterialTheme.typography.headlineSmall, color = AppColors.TextPrimary,
+        Text("Connect Device", style = MaterialTheme.typography.headlineSmall, color = AppColors.TextPrimary,
             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
         Text("Connect your phone and rack to the same Wi-Fi network.",
             style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)

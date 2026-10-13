@@ -42,9 +42,9 @@ fun HomeScreen(state: HomeUiState, onConnect: () -> Unit = {}, onControl: () -> 
             MiniSensor("Rain status", when { sensors == null -> "—"; sensors.rainDetected -> "Wet"; else -> "No rain" },
                 Icons.Outlined.Cloud, if (sensors?.rainDetected == true) AppColors.Warning else AppColors.Primary, Modifier.weight(1f))
         }
-        NeonFeatureRow(if (state.rackMode == RackMode.AUTO) "Auto mode ON" else "Manual mode ON",
-            if (state.rackMode == RackMode.AUTO) "Rack responds to rain and enabled schedules" else "You control the rack's movement",
-            Icons.Outlined.Settings, onControl)
+        NeonToggleRow(if (state.rackMode == RackMode.AUTO) "Auto mode ON" else "Auto mode OFF",
+            if (state.rackMode == RackMode.AUTO) "Rack operates automatically" else "Manual control is selected",
+            Icons.Outlined.Settings, checked = state.rackMode == RackMode.AUTO, onChange = { onControl() })
         val manual = state.rackMode == RackMode.MANUAL
         NeonAction(if (manual) "Retract rack" else "Open controls", Icons.Outlined.KeyboardDoubleArrowDown,
             if (manual) onRetract else onControl,
@@ -58,8 +58,6 @@ fun HomeScreen(state: HomeUiState, onConnect: () -> Unit = {}, onControl: () -> 
                 TextButton(onClick = onConnect) { Text("Connect rack") }
             }
         }
-        NeonFeatureRow("Rain protection", if (online) "Wet readings block extension. Confirmed rain requests retraction."
-            else "Firmware must protect the rack while your phone is disconnected.", Icons.Outlined.Umbrella)
         if (sensors?.clothesDryPercentage != null) {
             GlassCard(Modifier.fillMaxWidth()) {
                 Text("Clothes dryness · ${sensors.clothesDryPercentage}%", fontWeight = FontWeight.SemiBold)
@@ -74,10 +72,12 @@ fun HomeScreen(state: HomeUiState, onConnect: () -> Unit = {}, onControl: () -> 
 @Composable
 private fun MiniSensor(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, modifier: Modifier) {
     GlassCard(modifier, color) {
-        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(24.dp))
+        androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth(), horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(30.dp))
         Spacer(Modifier.height(5.dp))
         Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
         Text(label, style = MaterialTheme.typography.labelSmall, color = AppColors.TextSecondary)
+        }
     }
 }
 

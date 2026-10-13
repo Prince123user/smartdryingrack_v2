@@ -27,6 +27,9 @@ fun AlertsScreen(state: AlertsUiState, viewModel: AlertsViewModel) {
     val active = state.alerts.filterNot { it.read }
     val read = state.alerts.filter { it.read }
     ScreenColumn {
+        Text("Active monitoring and alerts", style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
+        RackHero(com.example.smartdryingrack.domain.model.RackState.UNKNOWN, showPosition = false)
+        Text("Alerts", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Text("Active alerts", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(selected = state.filter == null, onClick = { viewModel.setFilter(null) }, label = { Text("All") })

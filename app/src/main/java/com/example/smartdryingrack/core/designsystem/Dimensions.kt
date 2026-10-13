@@ -3,10 +3,10 @@ package com.example.smartdryingrack.core.designsystem
 import androidx.compose.ui.unit.dp
 
 object Dimens {
-    val ScreenPadding = 16.dp
+    val ScreenPadding = 14.dp
     val CardSpacing = 14.dp
-    val CardPadding = 12.dp
-    val CardRadius = 20.dp
+    val CardPadding = 10.dp
+    val CardRadius = 10.dp
     val SmallRadius = 12.dp
     val ButtonHeight = 52.dp
     val TouchTarget = 48.dp

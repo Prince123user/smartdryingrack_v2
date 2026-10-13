@@ -235,8 +235,8 @@ fun StatusBadge(text: String, accent: Color) {
 @Composable
 fun ModeSelector(mode: RackMode, onModeChange: (RackMode) -> Unit, modifier: Modifier = Modifier) {
     val haptic = LocalHapticFeedback.current
-    val outer = RoundedCornerShape(16.dp)
-    val inner = RoundedCornerShape(12.dp)
+    val outer = RoundedCornerShape(10.dp)
+    val inner = RoundedCornerShape(8.dp)
     Row(
         modifier.clip(outer).background(AppColors.Card).padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -252,7 +252,7 @@ fun ModeSelector(mode: RackMode, onModeChange: (RackMode) -> Unit, modifier: Mod
                     .weight(1f)
                     .heightIn(min = Dimens.MinTouch)
                     .clip(inner)
-                    .background(bg)
+                    .background(Brush.verticalGradient(if (selected) listOf(AppColors.Primary, AppColors.PrimaryVariant, AppColors.Card) else listOf(Color.Transparent, Color.Transparent)))
                     .border(1.dp, if (selected) AppColors.Primary else Color.Transparent, inner)
                     .selectable(selected = selected, role = Role.RadioButton, onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -262,7 +262,7 @@ fun ModeSelector(mode: RackMode, onModeChange: (RackMode) -> Unit, modifier: Mod
             ) {
                 Text(
                     stringResource(if (m == RackMode.AUTO) R.string.mode_auto else R.string.mode_manual),
-                    color = if (selected) AppColors.Primary else AppColors.TextSecondary,
+                    color = if (selected) AppColors.TextPrimary else AppColors.TextSecondary,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
                 )
             }

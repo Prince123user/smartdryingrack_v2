@@ -20,7 +20,13 @@ fun EventCard(event: RackEvent, onMarkRead: (Long) -> Unit, showBadge: Boolean =
     val color = if (event.read) AppColors.Primary else event.type.severity.color()
     GlassCard(Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = { onMarkRead(event.id) }), color) {
         Row(verticalAlignment = Alignment.Top) {
-            NeonIcon(event.type.eventIcon(), color)
+            if (!showBadge) {
+                androidx.compose.foundation.layout.Box(Modifier.width(76.dp).height(72.dp)) {
+                    ReferenceRack(Modifier.fillMaxSize())
+                    androidx.compose.material3.Icon(event.type.eventIcon(), null, tint = color,
+                        modifier = Modifier.align(Alignment.BottomEnd).size(24.dp))
+                }
+            } else NeonIcon(event.type.eventIcon(), color)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(stringResource(event.type.titleRes()), color = AppColors.TextPrimary,

@@ -109,6 +109,8 @@ fun ControlScreen(state: ControlUiState, actions: ControlActions) {
             MovementAction("Retract", Icons.Outlined.KeyboardDoubleArrowDown,
                 state.availability.retract == null, { actions.send(RackAction.RETRACT) }, Modifier.weight(1f))
         }
+        com.example.smartdryingrack.core.designsystem.NeonToggleRow("Buzzer", "Firmware sound control is unavailable",
+            Icons.Outlined.VolumeUp, checked = false, enabled = false)
         RackControlButton("Stop", { actions.send(RackAction.STOP) },
             enabled = state.availability.stop == null, modifier = Modifier.fillMaxWidth(), accent = AppColors.Warning)
 
