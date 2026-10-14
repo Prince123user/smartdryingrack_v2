@@ -47,19 +47,6 @@ class NavigationRenderTest {
     }
 
     @Test fun appLaunchesAndEveryPrimaryNavigationRenders() {
-        compose.waitUntil(10_000) { compose.onAllNodesWithText("Get Started").fetchSemanticsNodes().isNotEmpty() }
-        capture("10-introduction", "SMART\nDRYING RACK")
-        compose.onNodeWithText("Get Started").performClick()
-        compose.onNodeWithText("Smart Monitoring").assertIsDisplayed()
-        compose.onNodeWithText("Illustrative readings").assertExists()
-        compose.onNodeWithText("Home").assertDoesNotExist()
-        capture("11-monitoring", "Smart Monitoring")
-        compose.onNodeWithText("Next").performClick()
-        compose.onNodeWithText("Rain Protection").assertIsDisplayed()
-        capture("12-rain-protection", "Rain Protection")
-        compose.onNodeWithText("Continue").performClick()
-        capture("13-connect-device", "Connect Device")
-        compose.onNodeWithText("Explore offline").performScrollTo().performClick()
         compose.onNodeWithText("Connect your ESP32 rack").assertExists()
         compose.onNodeWithContentDescription("Illustration of a motorized drying rack with hanging laundry").assertExists()
         capture("01-home")
@@ -101,6 +88,80 @@ class NavigationRenderTest {
         capture("16-automation-settings", "Automation")
         compose.onNodeWithContentDescription("Back").performClick()
     }
+    @Test fun optionalOnboardingStillReachesHome() {
+        compose.runOnUiThread {
+            compose.activity.setContent {
+                com.example.smartdryingrack.core.navigation.SmartDryingRackRoot(startDestination = "welcome")
+            }
+        }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Get Started").fetchSemanticsNodes().isNotEmpty() }
+        capture("10-introduction", "SMART\nDRYING RACK")
+        compose.onNodeWithText("Get Started").performClick()
+        compose.onNodeWithText("Smart Monitoring").assertIsDisplayed()
+        compose.onNodeWithText("Illustrative readings").assertExists()
+        compose.onNodeWithText("Home").assertDoesNotExist()
+        capture("11-monitoring", "Smart Monitoring")
+        compose.onNodeWithText("Next").performClick()
+        compose.onNodeWithText("Rain Protection").assertIsDisplayed()
+        capture("12-rain-protection", "Rain Protection")
+        compose.onNodeWithText("Continue").performClick()
+        capture("13-connect-device", "Connect Device")
+        compose.onNodeWithText("Explore offline").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Home").assertIsSelected()
+        compose.onNodeWithText("Connect your ESP32 rack").assertExists()
+    }
+
+    @Test fun tabsAndSettingsLoopRepeatedlyFromHome() {
+        fun tab(label: String) = compose.onNode(hasContentDescription(label) and hasClickAction())
+        fun assertTab(label: String) {
+            tab(label).assertIsSelected()
+            when (label) {
+                "Home" -> compose.onNodeWithText("Connect your ESP32 rack").assertExists()
+                "Control" -> compose.onNodeWithText("Extend").assertExists()
+                "Alerts" -> compose.onNodeWithText("No new alerts").assertExists()
+                "History" -> compose.onNodeWithText("Waiting for temperature history").assertExists()
+            }
+        }
+        assertTab("Home")
+        compose.onNodeWithText("Get Started").assertDoesNotExist()
+        repeat(5) {
+            listOf("Control", "Home", "Alerts", "Control", "Home", "History").forEach { label ->
+                tab(label).performClick()
+                assertTab(label)
+            }
+            compose.onNodeWithText("Week").performClick()
+            compose.onNodeWithContentDescription("Settings").performClick()
+            compose.onNodeWithText("ESP32 rack").assertExists()
+            compose.onNodeWithContentDescription("Back").performClick()
+            assertTab("History")
+            // Settings also exposes the tabs, including a direct return to History.
+            compose.onNodeWithContentDescription("Settings").performClick()
+            tab("History").performClick()
+            assertTab("History")
+            compose.onNodeWithContentDescription("Notifications").performClick()
+            compose.onNodeWithContentDescription("Back").performClick()
+            assertTab("History")
+            tab("Home").performClick()
+            assertTab("Home")
+            tab("Control").performClick()
+            assertTab("Control")
+            compose.waitForIdle()
+            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+            assertTab("Home")
+        }
+        // Every ordered pair of primary destinations remains reachable.
+        repeat(2) {
+            listOf("Home", "Control", "Alerts", "History").forEach { source ->
+                listOf("Home", "Control", "Alerts", "History").forEach { target ->
+                    tab(source).performClick()
+                    assertTab(source)
+                    tab(target).performClick()
+                    assertTab(target)
+                }
+            }
+        }
+    }
+
     @Test fun largeTextLightDashboardKeepsConnectionActionAccessible() {
         var connectTapped = false
         compose.runOnUiThread {

@@ -1,6 +1,7 @@
 package com.example.smartdryingrack.core.navigation
 
 import androidx.annotation.StringRes
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,26 +23,18 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import com.example.smartdryingrack.core.designsystem.LocalDarkTheme
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -51,7 +44,7 @@ import com.example.smartdryingrack.feature.settings.SettingsViewModel
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -62,7 +55,6 @@ import com.example.smartdryingrack.core.designsystem.SmartDryingRackTheme
 import com.example.smartdryingrack.feature.alerts.AlertsRoute
 import com.example.smartdryingrack.feature.alerts.NotificationsScreen
 import com.example.smartdryingrack.feature.control.ControlRoute
-import com.example.smartdryingrack.feature.device.DeviceRoute
 import com.example.smartdryingrack.feature.history.HistoryRoute
 import com.example.smartdryingrack.feature.home.HomeRoute
 import com.example.smartdryingrack.feature.onboarding.DeviceSetupScreen
@@ -85,7 +77,7 @@ enum class Destination(val route: String, @StringRes val label: Int, val icon: I
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SmartDryingRackRoot(viewModel: SettingsViewModel = hiltViewModel()) {
+fun SmartDryingRackRoot(viewModel: SettingsViewModel = hiltViewModel(), startDestination: String = Destination.HOME.route) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val notifications: NotificationsViewModel = hiltViewModel()
     val events by notifications.events.collectAsStateWithLifecycle()
@@ -100,13 +92,16 @@ fun SmartDryingRackRoot(viewModel: SettingsViewModel = hiltViewModel()) {
             }
         }
     }
-    val initialRoute = remember { if (viewModel.address.value.isBlank()) "welcome" else "home" }
     SmartDryingRackTheme(darkTheme = settings.darkTheme) {
         val nav = rememberNavController()
         val backStack by nav.currentBackStackEntryAsState()
         val current = backStack?.destination?.route
 
-        val showBottomBar = current in Destination.entries.map { it.route }
+        BackHandler(enabled = current in Destination.entries.filter { it != Destination.HOME }.map { it.route }) {
+            nav.navigateToTab(Destination.HOME)
+        }
+
+        val showBottomBar = current in Destination.entries.map { it.route } || current == "settings"
         val showTopBar = current in Destination.entries.map { it.route } || current == "settings"
 
         Scaffold(
@@ -116,6 +111,11 @@ fun SmartDryingRackRoot(viewModel: SettingsViewModel = hiltViewModel()) {
                     TopAppBar(
                         title = { Text(when (current) { "history" -> "History"; "settings" -> "Settings"; else -> "Smart Drying Rack" }, color = AppColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp) },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = AppColors.Background),
+                        navigationIcon = {
+                            if (current == "settings") IconButton(onClick = { nav.returnToPreviousScreen() }) {
+                                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back", tint = AppColors.TextPrimary)
+                            }
+                        },
                         actions = {
                             IconButton(onClick = { nav.navigate("notifications") { launchSingleTop = true } }) {
                                 BadgedBox(badge = { if (unread > 0) Badge { Text(if (unread > 99) "99+" else unread.toString()) } }) {
@@ -132,16 +132,12 @@ fun SmartDryingRackRoot(viewModel: SettingsViewModel = hiltViewModel()) {
             bottomBar = {
                 if (showBottomBar) {
                     NeonNavigation(current) { destination ->
-                        nav.navigate(destination.route) {
-                            popUpTo(Destination.HOME.route) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+                        nav.navigateToTab(destination)
                     }
                 }
             }
         ) { padding ->
-            NavHost(nav, startDestination = initialRoute, modifier = Modifier.padding(padding),
+            NavHost(nav, startDestination = startDestination, modifier = Modifier.padding(padding),
                 enterTransition = { EnterTransition.None }, exitTransition = { ExitTransition.None },
                 popEnterTransition = { EnterTransition.None }, popExitTransition = { ExitTransition.None }) {
                 composable("welcome") {
@@ -169,20 +165,15 @@ fun SmartDryingRackRoot(viewModel: SettingsViewModel = hiltViewModel()) {
                 composable("device_setup") {
                     DeviceSetupScreen(
                         onFinishSetup = {
-                            nav.navigate(Destination.HOME.route) { popUpTo(nav.graph.id) { inclusive = true }; launchSingleTop = true }
+                            nav.navigate(Destination.HOME.route) { popUpTo(Destination.HOME.route) { inclusive = false }; launchSingleTop = true }
                         }
                     )
                 }
-                composable(Destination.HOME.route) { HomeRoute(onConnect = { nav.navigate("device_settings") }, onControl = { nav.navigate(Destination.CONTROL.route) { launchSingleTop = true } }) }
+                composable(Destination.HOME.route) { HomeRoute(onConnect = { nav.navigate("device_settings") }, onControl = { nav.navigateToTab(Destination.CONTROL) }) }
                 composable(Destination.CONTROL.route) { ControlRoute() }
                 composable(Destination.ALERTS.route) { AlertsRoute() }
                 composable("notifications") {
-                    NotificationsScreen(onBack = {
-                        nav.navigate(Destination.HOME.route) {
-                            popUpTo(Destination.HOME.route) { inclusive = false }
-                            launchSingleTop = true
-                        }
-                    })
+                    NotificationsScreen(onBack = { nav.returnToPreviousScreen() })
                 }
                 composable(Destination.HISTORY.route) { HistoryRoute() }
                 composable("settings") {
@@ -202,6 +193,24 @@ fun SmartDryingRackRoot(viewModel: SettingsViewModel = hiltViewModel()) {
             }
         }
     }
+}
+
+/** Keep Home as the root, and preserve each other tab's own state without restoring it as Home. */
+private fun NavHostController.navigateToTab(destination: Destination) {
+    // Auxiliary pages belong to the current visit, not the tab's saved state.
+    while (currentDestination?.route !in Destination.entries.map { it.route } && previousBackStackEntry != null) {
+        if (!popBackStack()) break
+    }
+    if (currentDestination?.route == destination.route) return
+    navigate(destination.route) {
+        popUpTo(Destination.HOME.route) { saveState = true }
+        launchSingleTop = true
+        restoreState = destination != Destination.HOME
+    }
+}
+
+private fun NavHostController.returnToPreviousScreen() {
+    if (!popBackStack()) navigateToTab(Destination.HOME)
 }
 
 @Composable
