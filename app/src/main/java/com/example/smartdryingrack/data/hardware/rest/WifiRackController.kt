@@ -14,9 +14,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class WifiRackController @Inject constructor(private val preferences: DevicePreferences) : RackController {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val api = RackApi()
+class WifiRackController internal constructor(
+    private val preferences: DevicePreferences,
+    private val api: RackApi,
+    private val scope: CoroutineScope
+) : RackController {
+    @Inject constructor(preferences: DevicePreferences) : this(
+        preferences, RackApi(), CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    )
     private val state = MutableStateFlow(RackState.UNKNOWN)
     private val sensors = MutableStateFlow<SensorData?>(null)
     private val connection = MutableStateFlow(ConnectionState.OFFLINE)
