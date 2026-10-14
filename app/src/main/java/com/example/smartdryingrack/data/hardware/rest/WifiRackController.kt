@@ -10,6 +10,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -19,9 +21,11 @@ class WifiRackController internal constructor(
     private val api: RackApi,
     private val scope: CoroutineScope
 ) : RackController {
-    @Inject constructor(preferences: DevicePreferences) : this(
-        preferences, RackApi(), CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    )
+    @Inject constructor(preferences: DevicePreferences, transport: WifiTransport) : this(
+        preferences, RackApi(transport::openConnection), CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    ) {
+        scope.launch { transport.changes.collect { resumeRequestedConnection(force = true) } }
+    }
     private val state = MutableStateFlow(RackState.UNKNOWN)
     private val sensors = MutableStateFlow<SensorData?>(null)
     private val connection = MutableStateFlow(ConnectionState.OFFLINE)
@@ -39,12 +43,26 @@ class WifiRackController internal constructor(
     override fun observeConnection() = connection.asStateFlow()
     override suspend fun isConnected() = connection.value == ConnectionState.ONLINE
 
+    private var reconnectEnabled = false
+
     override suspend fun connect() = lifecycle.withLock {
+        reconnectEnabled = true
+        startPolling()
+    }
+
+    /** Network/foreground events revive only a requested connection, never an explicit Disconnect. */
+    suspend fun resumeRequestedConnection(force: Boolean = false) = lifecycle.withLock {
+        if (reconnectEnabled && (force || connection.value != ConnectionState.ONLINE || polling?.isActive != true)) {
+            startPolling()
+        }
+    }
+
+    private fun startPolling() {
         reset()
         val address = preferences.address.value
         if (address.isBlank()) {
             _message.value = "Add your rack's Wi-Fi address to connect."
-            return@withLock
+            return
         }
         connection.value = ConnectionState.CONNECTING
         activeAddress = address
@@ -71,7 +89,7 @@ class WifiRackController internal constructor(
         }
     }
 
-    override suspend fun disconnect() = lifecycle.withLock { reset() }
+    override suspend fun disconnect() = lifecycle.withLock { reconnectEnabled = false; reset() }
 
     private fun reset() {
         generation++
@@ -82,6 +100,7 @@ class WifiRackController internal constructor(
         state.value = RackState.UNKNOWN
         sensors.value = null
         _firmware.value = null
+        _message.value = null
     }
 
     private suspend fun send(action: String) = withContext(Dispatchers.IO) {
@@ -90,6 +109,7 @@ class WifiRackController internal constructor(
         val address = activeAddress
         try {
             api.command(address, action)
+            if (session != generation) throw IOException("Connection changed before the command could be confirmed. Check the rack before retrying.")
             // Acceptance is not completion: physical position always comes from telemetry.
         } catch (e: Exception) {
             if (e is CancellationException) throw e

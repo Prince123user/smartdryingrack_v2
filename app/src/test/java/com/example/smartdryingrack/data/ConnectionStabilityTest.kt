@@ -27,7 +27,7 @@ class ConnectionStabilityTest {
         override fun close() { runBlocking { controller.disconnect() }; server.shutdown() }
     }
 
-    private fun fixture(scope: CoroutineScope): Fixture {
+    private fun fixture(scope: CoroutineScope, beforeCommand: (() -> Unit)? = null): Fixture {
         val server = MockWebServer()
         server.start(InetAddress.getByName("127.0.0.1"), 0)
         val context = RuntimeEnvironment.getApplication()
@@ -35,7 +35,10 @@ class ConnectionStabilityTest {
         val preferences = DevicePreferences(context)
         preferences.saveAddress("http://192.168.1.50:${server.port}")
         // Exercise real HTTP without needing a physical rack or changing address validation.
-        val api = RackApi { url -> URL("http://127.0.0.1:${server.port}${url.path}").openConnection() as HttpURLConnection }
+        val api = RackApi { url ->
+            if (url.path == "/api/commands") beforeCommand?.invoke()
+            URL("http://127.0.0.1:${server.port}${url.path}").openConnection() as HttpURLConnection
+        }
         return Fixture(server, WifiRackController(preferences, api, scope))
     }
 
@@ -57,6 +60,88 @@ class ConnectionStabilityTest {
                 assertEquals(RackState.RETRACTED, f.controller.observeRackState().value)
             }
             assertEquals(41, f.server.requestCount)
+        }
+    }
+
+    @Test fun droppedTcpConnectionRecoversWithoutConnectButton() = runTest {
+        fixture(backgroundScope).use { f ->
+            f.server.enqueue(MockResponse().setBody(status))
+            f.controller.connect(); runCurrent()
+            assertEquals(ConnectionState.ONLINE, f.controller.observeConnection().value)
+            // Close an established connection while sending the response, as a Wi-Fi loss can do.
+            f.server.enqueue(MockResponse().setBody(status).setSocketPolicy(SocketPolicy.DISCONNECT_DURING_RESPONSE_BODY))
+            advanceTimeBy(2000); runCurrent()
+            assertEquals(ConnectionState.ERROR, f.controller.observeConnection().value)
+            assertEquals(RackState.UNKNOWN, f.controller.observeRackState().value)
+            f.server.enqueue(MockResponse().setBody(status))
+            advanceTimeBy(5000); runCurrent()
+            assertEquals(ConnectionState.ONLINE, f.controller.observeConnection().value)
+        }
+    }
+
+    @Test fun prolongedUnavailableDeviceKeepsRetryingUntilItReturns() = runTest {
+        fixture(backgroundScope).use { f ->
+            repeat(12) { f.server.enqueue(MockResponse().setResponseCode(503)) }
+            f.server.enqueue(MockResponse().setBody(status))
+            f.controller.connect(); runCurrent()
+            repeat(11) {
+                advanceTimeBy(5000); runCurrent()
+                assertEquals(ConnectionState.ERROR, f.controller.observeConnection().value)
+            }
+            advanceTimeBy(5000); runCurrent()
+            assertEquals(ConnectionState.ONLINE, f.controller.observeConnection().value)
+            assertEquals(13, f.server.requestCount)
+        }
+    }
+
+    @Test fun networkReturnRestartsRecoveryImmediatelyWithoutWaitingForRetryDelay() = runTest {
+        fixture(backgroundScope).use { f ->
+            f.server.enqueue(MockResponse().setResponseCode(503))
+            f.controller.connect(); runCurrent()
+            assertEquals(ConnectionState.ERROR, f.controller.observeConnection().value)
+            f.server.enqueue(MockResponse().setBody(status))
+            f.controller.resumeRequestedConnection(force = true); runCurrent()
+            assertEquals(ConnectionState.ONLINE, f.controller.observeConnection().value)
+            assertEquals(2, f.server.requestCount)
+        }
+    }
+
+    @Test fun returningToAppRevivesFailedConnectionButPreservesExplicitDisconnect() = runTest {
+        fixture(backgroundScope).use { f ->
+            f.server.enqueue(MockResponse().setResponseCode(503))
+            f.controller.connect(); runCurrent()
+            f.server.enqueue(MockResponse().setBody(status))
+            f.controller.resumeRequestedConnection(); runCurrent()
+            assertEquals(ConnectionState.ONLINE, f.controller.observeConnection().value)
+            f.controller.disconnect()
+            f.controller.resumeRequestedConnection(force = true)
+            f.controller.resumeRequestedConnection()
+            advanceTimeBy(30000); runCurrent()
+            assertEquals(ConnectionState.OFFLINE, f.controller.observeConnection().value)
+            assertEquals(2, f.server.requestCount)
+        }
+    }
+
+    @Test fun acknowledgementFromObsoleteSessionIsNotConfirmedOrReplayed() = runTest {
+        lateinit var controller: WifiRackController
+        fixture(backgroundScope, beforeCommand = {
+            runBlocking { controller.resumeRequestedConnection(force = true) }
+        }).use { f ->
+            controller = f.controller
+            f.server.enqueue(MockResponse().setBody(status))
+            controller.connect(); runCurrent()
+            f.server.enqueue(MockResponse().setBody("{\"accepted\":true}"))
+            try {
+                runBlocking { controller.retract() }
+                fail("An acknowledgement across a connection change must not confirm the old session")
+            } catch (e: java.io.IOException) {
+                assertTrue(e.message!!.contains("Connection changed"))
+            }
+            assertEquals(2, f.server.requestCount)
+            f.server.enqueue(MockResponse().setBody(status))
+            runCurrent()
+            assertEquals(ConnectionState.ONLINE, controller.observeConnection().value)
+            assertEquals(listOf("/api/status", "/api/commands", "/api/status"), List(3) { f.server.takeRequest().path })
         }
     }
 

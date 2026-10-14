@@ -23,6 +23,8 @@ Connect the phone and ESP32 to the same Wi-Fi network. In Connection, enter a ba
 
 States: `EXTENDED`, `RETRACTED`, `EXTENDING`, `RETRACTING`, `STOPPED`, `ERROR`, `UNKNOWN`. Temperature must be a finite number from -50 to 80 °C, humidity from 0 to 100%, and rainDetected a boolean. Dryness is an optional integer from 0 to 100; omit it or return null if no calibrated clothes sensor is fitted. The app does not derive clothes dryness from air humidity. Firmware must return current sensor samples, not a cached historical reading. The app timestamps receipt and blocks extension if its last reading is over six seconds old.
 
+Local HTTP requests use the phone’s Wi-Fi network even when Android prefers mobile data for Internet access. Wi-Fi loss/return immediately restarts a requested connection, and returning to the app revives a failed polling loop. Tapping Disconnect intentionally disables this recovery until Connect is tapped again.
+
 Polling runs every two seconds after success and every five seconds after failure. Requests have 2.5-second connection/read timeouts. Bad status or sensor data marks the connection unavailable and rack position unknown; retained readings are labelled stale. No firmware version, signal strength or device identity is invented.
 
 ## Commands

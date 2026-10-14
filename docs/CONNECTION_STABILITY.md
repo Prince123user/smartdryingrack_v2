@@ -2,9 +2,9 @@
 
 ## App checks
 
-`ConnectionStabilityTest` exercises the production Wi-Fi controller and REST client against a local HTTP server. Only the test transport maps the validated private device URL to loopback. The production constructor still uses its original REST client and IO coroutine scope.
+`ConnectionStabilityTest` exercises the production Wi-Fi controller and REST client against a local HTTP server. Only the test transport maps the validated private device URL to loopback. The production constructor uses a Wi-Fi-aware HTTP transport and its IO coroutine scope. Local HTTP requests are opened on the Wi-Fi network, including Wi-Fi without Internet; HTTPS requests keep the normal system route.
 
-All six targeted checks passed:
+The original six targeted checks passed:
 
 - Automatic recovery across 20 status failures: 41 status requests, with every failure marking the connection unavailable and every subsequent valid response restoring it.
 - Malformed telemetry stays unavailable until a valid response arrives.
@@ -14,6 +14,14 @@ All six targeted checks passed:
 - A rejected motor command is sent once; status polling can subsequently restore connection without resending the command.
 
 Polling waits two seconds after success and five seconds after failure. These intervals are in addition to HTTP request duration. Connect and read each have a 2.5-second timeout; they are not a single 2.5-second deadline for the complete request. Automation requires readings no older than six seconds. Motor requests are not intentionally retried.
+
+## Follow-up: physical reconnect failure
+
+The user reported that the actual app does not recover reliably after disconnection, while the phone can still reach the rack status endpoint and manual Connect works intermittently. This physical failure supersedes any assumption that server tests establish end-to-end hardware stability.
+
+The app now observes Wi-Fi availability/loss and immediately restarts an explicitly requested connection when the network changes. Returning to the foreground also restarts a failed or stopped polling loop. Local rack HTTP requests explicitly use Wi-Fi rather than Android's possibly cellular default route. No global process network binding is used; intentional Disconnect suppresses these automatic restarts. Commands are never replayed by reconnect, and a response from an obsolete connection session cannot be treated as a confirmed command.
+
+Additional checks cover interrupted TCP responses, a minute of server unavailability followed by automatic recovery, immediate network-event recovery, foreground recovery, intentional-disconnect preservation, selecting Wi-Fi without Internet over a cellular default, missing Wi-Fi, and network observer registration/cleanup. These remain software tests; the updated APK still needs the same five-cycle physical retest.
 
 ## Firmware inspection
 
@@ -26,7 +34,7 @@ Important practical limits:
 - Phone polling only runs while the application process can execute. Background suspension or process termination can interrupt it; local firmware protection remains independent.
 - The sketch logs API startup, but does not currently log Wi-Fi reconnection events, IP changes, or signal strength.
 
-## Physical check — awaiting user results
+## Physical check — initial failure reported; updated APK retest pending
 
 1. With the phone and ESP32 on the same Wi-Fi, open `http://<rack-IP>/api/status` on the phone. Confirm valid telemetry; record any HTTP error.
 2. Connect the app and leave the rack stationary. Observe the connection for 15 minutes and count any unexpected connection errors.
