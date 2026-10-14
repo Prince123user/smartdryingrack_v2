@@ -20,7 +20,7 @@ data class AutomationSettings(
 )
 
 data class RackSchedule(
-    val enabled: Boolean = true,
+    val enabled: Boolean = false,
     val extendTime: LocalTime = LocalTime.of(8, 0),
     val retractTime: LocalTime = LocalTime.of(17, 0),
     val monday: Boolean = true,

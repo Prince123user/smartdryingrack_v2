@@ -20,13 +20,13 @@ import kotlin.math.roundToInt
 fun HomeRoute(onConnect: () -> Unit = {}, onControl: () -> Unit = {}, viewModel: HomeViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
-    HomeScreen(state, onConnect, onControl, viewModel::retract, message)
+    HomeScreen(state, onConnect, onControl, viewModel::retract, message, viewModel::setAutoMode)
 }
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(state: HomeUiState, onConnect: () -> Unit = {}, onControl: () -> Unit = {},
-               onRetract: () -> Unit = {}, message: String? = null) {
+               onRetract: () -> Unit = {}, message: String? = null, onAutoModeChange: ((Boolean) -> Unit)? = null) {
     val sensors = state.sensorData?.takeIf { it.isValid }
     val online = state.connection == ConnectionState.ONLINE
     ScreenColumn {
@@ -44,7 +44,7 @@ fun HomeScreen(state: HomeUiState, onConnect: () -> Unit = {}, onControl: () -> 
         }
         NeonToggleRow(if (state.rackMode == RackMode.AUTO) "Auto mode ON" else "Auto mode OFF",
             if (state.rackMode == RackMode.AUTO) "Rack operates automatically" else "Manual control is selected",
-            Icons.Outlined.Settings, checked = state.rackMode == RackMode.AUTO, onChange = { onControl() })
+            Icons.Outlined.Settings, checked = state.rackMode == RackMode.AUTO, onChange = onAutoModeChange ?: { onControl() })
         val manual = state.rackMode == RackMode.MANUAL
         NeonAction(if (manual) "Retract rack" else "Open controls", Icons.Outlined.KeyboardDoubleArrowDown,
             if (manual) onRetract else onControl,

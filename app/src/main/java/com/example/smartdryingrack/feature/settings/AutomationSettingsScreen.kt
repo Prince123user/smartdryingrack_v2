@@ -27,18 +27,23 @@ fun AutomationSettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel = 
         NeonToggleRow("Rain Protection", "Automatically retracts the rack when rain is confirmed",
             androidx.compose.material.icons.Icons.Outlined.Umbrella, checked = true, enabled = false)
         GlassCard(Modifier.fillMaxWidth()) {
-            Text("Rain Sensor Sensitivity", style = MaterialTheme.typography.titleMedium)
-            Text("Adjust sensitivity to rain detection.", style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
-            Slider(value = sensitivity, onValueChange = { sensitivity = it },
-                onValueChangeFinished = { viewModel.update { it.copy(rainSensitivity = sensitivity) } })
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Low"); Text("Medium"); Text("High")
-            }
+            Text("Rain sensor calibration", style = MaterialTheme.typography.titleMedium)
+            Text(controlState.rainRaw?.let { "Current raw reading: $it" } ?: "Raw reading requires updated ESP32 firmware.",
+                style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
+            Text("Record dry and wet readings, then set the sensor threshold and polarity in the firmware. Rain protection stays enabled.",
+                style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
         }
         TextButton(onClick = { advanced = !advanced }, modifier = Modifier.fillMaxWidth()) {
             Text(if (advanced) "Hide advanced settings" else "Advanced settings")
         }
         if (advanced) {
+            GlassCard(Modifier.fillMaxWidth()) {
+                Text("Forecast rain sensitivity", style = MaterialTheme.typography.titleMedium)
+                Text("Applies only to a configured forecast provider; it does not change the physical rain sensor.",
+                    style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
+                Slider(value = sensitivity, onValueChange = { sensitivity = it },
+                    onValueChangeFinished = { viewModel.update { it.copy(rainSensitivity = sensitivity) } })
+            }
             GlassCard(Modifier.fillMaxWidth()) {
                 Text("Clothes dryness target · ${threshold.roundToInt()}%", style = MaterialTheme.typography.titleMedium)
                 Slider(value = threshold, onValueChange = { threshold = it }, valueRange = 50f..100f,

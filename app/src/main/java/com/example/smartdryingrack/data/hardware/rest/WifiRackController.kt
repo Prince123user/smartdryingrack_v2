@@ -33,6 +33,13 @@ class WifiRackController internal constructor(
     val message = _message.asStateFlow()
     private val _firmware = MutableStateFlow<String?>(null)
     val firmware = _firmware.asStateFlow()
+    private val settingsRequest = Mutex()
+    private val _buzzerEnabled = MutableStateFlow<Boolean?>(null)
+    val buzzerEnabled = _buzzerEnabled.asStateFlow()
+    private val _rainRaw = MutableStateFlow<Int?>(null)
+    val rainRaw = _rainRaw.asStateFlow()
+    private val _motionReason = MutableStateFlow<String?>(null)
+    val motionReason = _motionReason.asStateFlow()
     private var polling: Job? = null
     @Volatile private var generation = 0L
     @Volatile private var activeAddress = ""
@@ -70,13 +77,18 @@ class WifiRackController internal constructor(
         polling = scope.launch {
             while (isActive && session == generation) {
                 try {
-                    val snapshot = api.status(address)
-                    if (session != generation) return@launch
-                    state.value = snapshot.state
-                    sensors.value = snapshot.sensors
-                    _firmware.value = snapshot.firmware
-                    _message.value = null
-                    connection.value = ConnectionState.ONLINE
+                    settingsRequest.withLock {
+                        val snapshot = api.status(address)
+                        if (session != generation) return@launch
+                        state.value = snapshot.state
+                        sensors.value = snapshot.sensors
+                        _firmware.value = snapshot.firmware
+                        _buzzerEnabled.value = snapshot.buzzerEnabled
+                        _rainRaw.value = snapshot.rainRaw
+                        _motionReason.value = snapshot.motionReason
+                        _message.value = null
+                        connection.value = ConnectionState.ONLINE
+                    }
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
                     if (session != generation) return@launch
@@ -101,6 +113,21 @@ class WifiRackController internal constructor(
         sensors.value = null
         _firmware.value = null
         _message.value = null
+        _buzzerEnabled.value = null
+        _rainRaw.value = null
+        _motionReason.value = null
+    }
+
+    suspend fun setBuzzer(enabled: Boolean) = withContext(Dispatchers.IO) {
+        check(connection.value == ConnectionState.ONLINE) { "Connect the rack before changing its buzzer." }
+        check(_buzzerEnabled.value != null) { "Update the ESP32 firmware to enable buzzer control." }
+        val session = generation
+        val address = activeAddress
+        settingsRequest.withLock {
+            val confirmed = api.setBuzzer(address, enabled)
+            if (session != generation) throw IOException("Connection changed; buzzer setting could not be confirmed.")
+            _buzzerEnabled.value = confirmed
+        }
     }
 
     private suspend fun send(action: String) = withContext(Dispatchers.IO) {

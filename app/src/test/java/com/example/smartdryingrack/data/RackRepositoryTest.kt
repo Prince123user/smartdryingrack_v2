@@ -95,12 +95,35 @@ class RackRepositoryTest {
         val controller = Controller()
         val repository = ready(controller)
         assertEquals(CommandResult.Accepted, repository.send(RackAction.EXTEND, CommandSource.MANUAL))
+        controller.sensors.value = controller.sensors.value!!.copy(rainDetected = true, timestamp = System.currentTimeMillis())
+        withTimeout(2000) { repository.sensorData.first { it?.rainDetected == true } }
+        repository.setRainConfirmed(true)
         // The last telemetry still says RETRACTED. A pending extension must nevertheless be stopped.
         assertEquals(CommandResult.Accepted, repository.send(RackAction.RETRACT, CommandSource.RAIN))
         assertEquals(listOf("EXTEND", "STOP", "RETRACT"), controller.commands)
         repository.send(RackAction.STOP, CommandSource.EMERGENCY)
         Unit
     }
+    @Test fun oldRainConfirmationCannotRetractOnFreshDryTelemetry() = runBlocking {
+        val controller = Controller()
+        controller.state.value = RackState.EXTENDED
+        val repository = ready(controller)
+        repository.setMode(RackMode.AUTO)
+        repository.setRainConfirmed(true)
+        assertEquals(CommandResult.Rejected(RejectReason.ERROR), repository.send(RackAction.RETRACT, CommandSource.RAIN))
+        assertTrue(controller.commands.isEmpty())
+    }
+
+    @Test fun staleWetTelemetryCannotTriggerRainRetraction() = runBlocking {
+        val controller = Controller()
+        controller.state.value = RackState.EXTENDED
+        controller.sensors.value = controller.sensors.value!!.copy(rainDetected = true, timestamp = System.currentTimeMillis() - 20000)
+        val repository = ready(controller)
+        repository.setRainConfirmed(true)
+        assertEquals(CommandResult.Rejected(RejectReason.ERROR), repository.send(RackAction.RETRACT, CommandSource.RAIN))
+        assertTrue(controller.commands.isEmpty())
+    }
+
     @Test fun completionRequiresTelemetryReceivedAfterCommandAcceptance() = runBlocking {
         val controller = Controller()
         val repository = ready(controller)

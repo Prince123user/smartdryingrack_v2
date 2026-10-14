@@ -58,7 +58,7 @@ App automation runs only while the process is alive and connected. It is not a b
 
 - Weather provider and location: forecasts are shown as unavailable; no demo forecast drives automation.
 - BLE, MQTT, Wi-Fi provisioning and device discovery.
-- Remote authentication, cloud control, system push notifications and firmware buzzer settings.
+- Remote authentication, cloud control and system push notifications.
 - Physical hardware and device UI validation: the cloud checks validate the REST adapter against a local HTTP test server, not your ESP32.
 
 ## Commissioning
@@ -69,3 +69,11 @@ App automation runs only while the process is alive and connected. It is not a b
 4. Test wet-sensor extension blocking, three consecutive wet samples and automatic retraction.
 5. Disconnect Wi-Fi and verify the ESP32 independently handles rain and motor safety.
 6. Verify motor timeout, physical emergency stop and command deduplication before enabling unattended schedules.
+
+## Buzzer configuration (firmware 1.1.0+)
+
+`GET /api/status` may include a top-level boolean `buzzerEnabled`, `motionReason`, and `sensors.rainRaw`. Absence of `buzzerEnabled` means this firmware does not expose app buzzer support.
+
+`POST /api/buzzer` accepts `{"enabled":true,"requestId":"<unique ID>"}` and returns `{"accepted":true,"buzzerEnabled":true}`. The returned boolean must match the requested value. The firmware persists it and beeps briefly on enable. Setting changes do not move the rack, and acknowledgements from an obsolete connection session are not accepted.
+
+Rain-triggered app retraction requires current, fresh wet telemetry and confirmation; a stale debounce confirmation is insufficient when the latest reading is dry. Explicit schedules may still retract on dry days when enabled. New schedules default to disabled.

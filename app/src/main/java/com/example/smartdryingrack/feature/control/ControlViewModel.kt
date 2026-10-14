@@ -39,10 +39,16 @@ data class ControlUiState(
     val schedule: RackSchedule = RackSchedule(),
     val settings: AutomationSettings = AutomationSettings(),
     val pendingMovement: RackState? = null,
+    val buzzerEnabled: Boolean? = null,
+    val buzzerUpdating: Boolean = false,
+    val deviceMessage: String? = null,
+    val rainRaw: Int? = null,
+    val motionReason: String? = null,
     val rejection: RejectReason? = null
 )
 
 interface ControlActions {
+    fun setBuzzerEnabled(enabled: Boolean)
     fun setMode(mode: RackMode)
     fun send(action: RackAction)
     fun emergencyStop()
@@ -57,7 +63,8 @@ interface ControlActions {
 class ControlViewModel @Inject constructor(
     private val rack: RackRepository,
     private val schedules: ScheduleRepository,
-    private val settings: SettingsRepository
+    private val settings: SettingsRepository,
+    private val controller: com.example.smartdryingrack.data.hardware.rest.WifiRackController
 ) : ViewModel(), ControlActions {
 
     private val rejection = MutableStateFlow<RejectReason?>(null)
@@ -75,13 +82,36 @@ class ControlViewModel @Inject constructor(
         )
     }
 
-    val uiState: StateFlow<ControlUiState> =
+    private val buzzerUpdating = MutableStateFlow(false)
+    private val deviceMessage = MutableStateFlow<String?>(null)
+    private data class DeviceControls(val buzzer: Boolean?, val updating: Boolean, val message: String?, val raw: Int?, val reason: String?)
+    private val deviceControls = combine(controller.buzzerEnabled, buzzerUpdating, deviceMessage, controller.rainRaw, controller.motionReason) { buzzer, updating, message, raw, reason ->
+        DeviceControls(buzzer, updating, message, raw, reason)
+    }
+    private val controls =
         combine(base, schedules.schedule, settings.settings, rejection, rack.pendingMovement) { b, sch, set, rej, pending ->
             b.copy(schedule = sch, settings = set, rejection = rej, pendingMovement = pending,
                 availability = if (pending == null) b.availability else b.availability.copy(
                     extend = com.example.smartdryingrack.domain.model.Unavailable.MOVING,
                     retract = com.example.smartdryingrack.domain.model.Unavailable.MOVING))
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ControlUiState())
+        }
+    val uiState: StateFlow<ControlUiState> = combine(controls, deviceControls) { state, device ->
+        state.copy(buzzerEnabled = device.buzzer, buzzerUpdating = device.updating, deviceMessage = device.message,
+            rainRaw = device.raw, motionReason = device.reason)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ControlUiState())
+
+    override fun setBuzzerEnabled(enabled: Boolean) {
+        if (buzzerUpdating.value) return
+        buzzerUpdating.value = true
+        deviceMessage.value = null
+        viewModelScope.launch {
+            try { controller.setBuzzer(enabled) }
+            catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                deviceMessage.value = e.message ?: "Buzzer setting could not be confirmed."
+            } finally { buzzerUpdating.value = false }
+        }
+    }
 
     override fun setMode(mode: RackMode) {
         rejection.value = null

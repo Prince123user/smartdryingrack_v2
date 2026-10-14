@@ -145,6 +145,34 @@ class ConnectionStabilityTest {
         }
     }
 
+    @Test fun buzzerUiStateChangesOnlyAfterConfirmedDeviceResponse() = runTest {
+        fixture(backgroundScope).use { f ->
+            f.server.enqueue(MockResponse().setBody(status.dropLast(1) + ",\"buzzerEnabled\":true}"))
+            f.controller.connect(); runCurrent()
+            assertEquals(true, f.controller.buzzerEnabled.value)
+            f.server.enqueue(MockResponse().setBody("{\"accepted\":true,\"buzzerEnabled\":false}"))
+            runBlocking { f.controller.setBuzzer(false) }
+            assertEquals(false, f.controller.buzzerEnabled.value)
+            f.server.enqueue(MockResponse().setBody("{\"accepted\":true,\"buzzerEnabled\":false}"))
+            try { runBlocking { f.controller.setBuzzer(true) }; fail("Unconfirmed settings must fail") }
+            catch (_: java.io.IOException) { }
+            assertEquals(false, f.controller.buzzerEnabled.value)
+            f.controller.disconnect()
+            assertNull(f.controller.buzzerEnabled.value)
+        }
+    }
+
+    @Test fun oldFirmwareDoesNotExposeAWorkingBuzzerSwitch() = runTest {
+        fixture(backgroundScope).use { f ->
+            f.server.enqueue(MockResponse().setBody(status))
+            f.controller.connect(); runCurrent()
+            assertNull(f.controller.buzzerEnabled.value)
+            try { runBlocking { f.controller.setBuzzer(true) }; fail("Unsupported firmware must not accept a setting") }
+            catch (_: IllegalStateException) { }
+            assertEquals(1, f.server.requestCount)
+        }
+    }
+
     @Test fun malformedTelemetryNeverMarksOnlineAndLaterValidTelemetryRecovers() = runTest {
         fixture(backgroundScope).use { f ->
             f.server.enqueue(MockResponse().setBody("{}"))

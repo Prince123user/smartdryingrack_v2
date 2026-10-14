@@ -88,7 +88,8 @@ class AutomationManager @Inject constructor(
         if (newReading) temperatureHistory.record(data.timestamp, data.temperature)
 
         val s = settings.settings.value
-        val rainConfirmed = if (newReading) debouncer.onReading(data.rainDetected) else rainActive
+        if (newReading) debouncer.onReading(data.rainDetected)
+        val rainConfirmed = debouncer.permitsRainRetraction(data.rainDetected)
         if (rainConfirmed && !rainActive) events.record(EventType.RAIN_DETECTED)
         rainActive = rainConfirmed
         rack.setRainConfirmed(rainConfirmed)

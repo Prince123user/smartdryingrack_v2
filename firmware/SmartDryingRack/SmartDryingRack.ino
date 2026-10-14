@@ -5,11 +5,10 @@
  *   GET  /api/status
  *   POST /api/commands
  *
- * The Android app sends only EXTEND, RETRACT and STOP commands. It does not
- * currently send mode, buzzer, rain-protection, or sensitivity settings.
- * Those values are therefore safe local firmware settings below.
+ * The Android app sends EXTEND, RETRACT and STOP, and POST /api/buzzer.
+ * Mode, rain-protection and sensitivity remain local firmware settings.
  *
- * Tested target: ESP32 Arduino core 3.x, board "ESP32 Dev Module".
+ * Target: ESP32 Arduino core 3.x, board "ESP32 Dev Module".
  * Required libraries:
  *   - DHT sensor library by Adafruit 1.4.6+
  *   - Adafruit Unified Sensor 1.1.15+
@@ -21,6 +20,7 @@
 #include <WebServer.h>
 #include <ESP32Servo.h>
 #include <DHT.h>
+#include <Preferences.h>
 
 // ---------------------------- Wi-Fi ---------------------------------------
 const char* WIFI_SSID = "REPLACE_WITH_WIFI_NAME";
@@ -66,11 +66,14 @@ constexpr unsigned long WIFI_RETRY_PERIOD_MS = 10000;
 constexpr unsigned long BOOT_RETRACT_TIME_MS = 2500;
 constexpr unsigned long MAX_MOTION_TIME_MS = 15000;
 
-constexpr char FIRMWARE_VERSION[] = "1.0.0";
+constexpr char FIRMWARE_VERSION[] = "1.1.0";
 
 DHT dht(DHT_PIN, DHT22);
 Servo rackServo;
 WebServer server(80);
+Preferences deviceSettings;
+bool buzzerEnabled = BUZZER_ENABLED;
+const char* motionReason = "NONE";
 
 enum RackState { EXTENDED, RETRACTED, EXTENDING, RETRACTING, STOPPED, ERROR_STATE, UNKNOWN };
 RackState rackState = UNKNOWN;
@@ -145,10 +148,15 @@ String jsonString(const String& body, const char* key) {
   if (keyAt < 0) return "";
   int colon = body.indexOf(':', keyAt + marker.length());
   if (colon < 0) return "";
-  int firstQuote = body.indexOf('"', colon + 1);
-  if (firstQuote < 0) return "";
+  int firstQuote = colon + 1;
+  while (firstQuote < (int)body.length() && (body[firstQuote] == ' ' || body[firstQuote] == '\t' || body[firstQuote] == '\r' || body[firstQuote] == '\n')) firstQuote++;
+  if (firstQuote >= (int)body.length() || body[firstQuote] != '"') return "";
   int secondQuote = body.indexOf('"', firstQuote + 1);
   if (secondQuote < 0) return "";
+  // Request IDs/actions use unescaped ASCII tokens, not nested JSON or quoted values.
+  for (int i = firstQuote + 1; i < secondQuote; ++i) {
+    if (body[i] == '\\' || (unsigned char)body[i] < 32) return "";
+  }
   return body.substring(firstQuote + 1, secondQuote);
 }
 
@@ -183,7 +191,7 @@ void cacheResponse(const String& requestId, const String& response) {
 }
 
 void beep(uint16_t frequency, uint16_t duration) {
-  if (BUZZER_ENABLED) tone(BUZZER_PIN, frequency, duration);
+  if (buzzerEnabled) tone(BUZZER_PIN, frequency, duration);
 }
 
 void stopBuzzer() { noTone(BUZZER_PIN); }
@@ -195,7 +203,8 @@ void setServoError() {
   stopBuzzer();
 }
 
-void beginMotion(bool retract) {
+void beginMotion(bool retract, const char* reason) {
+  motionReason = reason;
   targetAngle = retract ? RETRACT_ANGLE : EXTEND_ANGLE;
   targetAngle = constrain(targetAngle, 0, 180);
   int distance = abs(targetAngle - currentAngle);
@@ -209,6 +218,7 @@ void beginMotion(bool retract) {
 }
 
 void beginBootRetraction() {
+  motionReason = "BOOT_HOMING";
   // There is no position sensor. Move to the conservative angle immediately,
   // then expose RETRACTING until the configured travel window has elapsed.
   currentAngle = RETRACT_ANGLE;
@@ -297,7 +307,7 @@ void updateRain() {
   }
   if (RAIN_PROTECTION_ENABLED && rainConfirmed && !previousRainConfirmed) {
     beep(2200, 180);
-    if (rackState == EXTENDED || rackState == EXTENDING || rackState == STOPPED) beginMotion(true);
+    if (rackState == EXTENDED || rackState == EXTENDING || rackState == STOPPED) beginMotion(true, "RAIN_PROTECTION");
   }
   previousRainConfirmed = rainConfirmed;
 }
@@ -324,9 +334,14 @@ void handleStatus() {
   body += ",\"humidity\":" + String(humidityPercent, 1);
   body += ",\"rainDetected\":" + String(rainConfirmed ? "true" : "false");
   body += ",\"clothesDryPercentage\":null";
+  body += ",\"rainRaw\":" + String(lastRainRaw);
   body += "},\"positionSource\":\"COMMAND_ESTIMATE\",\"positionMeasured\":false";
   body += ",\"mode\":\"" + String(modeName()) + "\"";
   body += ",\"rainProtectionEnabled\":" + String(RAIN_PROTECTION_ENABLED ? "true" : "false");
+  body += ",\"buzzerEnabled\":" + String(buzzerEnabled ? "true" : "false");
+  body += ",\"motionReason\":\"" + String(motionReason) + "\"";
+  body += ",\"rainThreshold\":" + String(RAIN_THRESHOLD);
+  body += ",\"rainWetWhenAnalogBelow\":" + String(RAIN_WET_WHEN_ANALOG_BELOW ? "true" : "false");
   body += "}";
   sendJson(200, body);
 }
@@ -356,7 +371,7 @@ void handleCommand() {
   } else if (action == "RETRACT") {
     if (rackState == RETRACTED && !moving) response = statusJson(false, "ALREADY_RETRACTED");
     else {
-      beginMotion(true);
+      beginMotion(true, "REST_COMMAND");
       response = statusJson(true);
     }
   } else if (action == "EXTEND") {
@@ -364,7 +379,7 @@ void handleCommand() {
     else if (!dhtValid) response = statusJson(false, "SENSOR_UNAVAILABLE");
     else if ((rackState == EXTENDED) && !moving) response = statusJson(false, "ALREADY_EXTENDED");
     else {
-      beginMotion(false);
+      beginMotion(false, "REST_COMMAND");
       response = statusJson(true);
     }
   } else {
@@ -374,11 +389,52 @@ void handleCommand() {
   sendJson(response.startsWith("{\"accepted\":true") ? 200 : 409, response);
 }
 
-void handleNotFound() { sendError(404, "NOT_FOUND", "Use /api/status or /api/commands"); }
+// Accept a JSON boolean, not a quoted string or a numeric truthy value.
+bool jsonBoolean(const String& body, const char* key, bool& value) {
+  String marker = "\"" + String(key) + "\"";
+  int at = body.indexOf(marker);
+  if (at < 0) return false;
+  int colon = body.indexOf(':', at + marker.length());
+  if (colon < 0) return false;
+  int end = body.indexOf(',', colon + 1);
+  int brace = body.indexOf('}', colon + 1);
+  if (brace < 0) return false;
+  if (end < 0 || brace < end) end = brace;
+  String token = body.substring(colon + 1, end);
+  token.trim();
+  if (token == "true") { value = true; return true; }
+  if (token == "false") { value = false; return true; }
+  return false;
+}
+
+void handleBuzzer() {
+  if (!server.hasArg("plain")) { sendError(400, "INVALID_REQUEST", "JSON request body is required"); return; }
+  String body = server.arg("plain");
+  String id = requestIdFor(body);
+  bool enabled;
+  if (id.isEmpty() || !jsonBoolean(body, "enabled", enabled)) {
+    sendError(400, "INVALID_REQUEST", "enabled must be a boolean and requestId is required");
+    return;
+  }
+  String cacheKey = "buzzer:" + id;
+  String previous = cachedResponse(cacheKey);
+  if (!previous.isEmpty()) { sendJson(200, previous); return; }
+  buzzerEnabled = enabled;
+  deviceSettings.putBool("buzzer", enabled);
+  if (!enabled) stopBuzzer();
+  else beep(1800, 150);
+  String response = "{\"accepted\":true,\"buzzerEnabled\":" + String(enabled ? "true" : "false") + "}";
+  cacheResponse(cacheKey, response);
+  sendJson(200, response);
+}
+
+void handleNotFound() { sendError(404, "NOT_FOUND", "Use /api/status, /api/commands or /api/buzzer"); }
 
 void setup() {
   Serial.begin(115200);
   pinMode(BUZZER_PIN, OUTPUT);
+  deviceSettings.begin("rack", false);
+  buzzerEnabled = deviceSettings.getBool("buzzer", BUZZER_ENABLED);
   pinMode(RAIN_AO_PIN, INPUT);
   if (USE_RAIN_DIGITAL_OUTPUT) pinMode(RAIN_DO_PIN, INPUT);
   analogReadResolution(12);
@@ -399,6 +455,8 @@ void setup() {
   server.on("/api/status", HTTP_OPTIONS, handleOptions);
   server.on("/api/commands", HTTP_POST, handleCommand);
   server.on("/api/commands", HTTP_OPTIONS, handleOptions);
+  server.on("/api/buzzer", HTTP_POST, handleBuzzer);
+  server.on("/api/buzzer", HTTP_OPTIONS, handleOptions);
   server.onNotFound(handleNotFound);
   server.begin();
   Serial.println("Smart Drying Rack API started");
@@ -409,7 +467,7 @@ void loop() {
   updateWifi();
   updateDht();
   updateRain();
-  if (RAIN_PROTECTION_ENABLED && rainConfirmed && (rackState == EXTENDED || rackState == EXTENDING || rackState == STOPPED)) beginMotion(true);
+  if (RAIN_PROTECTION_ENABLED && rainConfirmed && (rackState == EXTENDED || rackState == EXTENDING || rackState == STOPPED)) beginMotion(true, "RAIN_PROTECTION");
   updateServo();
   delay(1);
 }

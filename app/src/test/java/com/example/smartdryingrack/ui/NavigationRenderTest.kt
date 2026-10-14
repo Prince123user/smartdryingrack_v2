@@ -84,7 +84,7 @@ class NavigationRenderTest {
         capture("15-notification-settings", "Notification Settings")
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNode(hasText("Automation") and hasClickAction()).performScrollTo().performClick()
-        compose.onNodeWithText("Rain Sensor Sensitivity").assertExists()
+        compose.onNodeWithText("Rain sensor calibration").assertExists()
         capture("16-automation-settings", "Automation")
         compose.onNodeWithContentDescription("Back").performClick()
     }
@@ -160,6 +160,49 @@ class NavigationRenderTest {
                 }
             }
         }
+    }
+
+    @Test fun buzzerSwitchSendsRequestedSettingAndWaitsForDeviceConfirmation() {
+        val actions = org.mockito.Mockito.mock(com.example.smartdryingrack.feature.control.ControlActions::class.java)
+        compose.runOnUiThread {
+            compose.activity.setContent {
+                SmartDryingRackTheme {
+                    Surface {
+                        Column {
+                            Text("Smart Drying Rack")
+                            Text("Render test · connected buzzer fixture")
+                            com.example.smartdryingrack.feature.control.ControlScreen(
+                                com.example.smartdryingrack.feature.control.ControlUiState(
+                                    connection = com.example.smartdryingrack.domain.model.ConnectionState.ONLINE,
+                                    rackState = com.example.smartdryingrack.domain.model.RackState.EXTENDED,
+                                    buzzerEnabled = true), actions)
+                        }
+                    }
+                }
+            }
+        }
+        compose.onNodeWithContentDescription("Buzzer").performScrollTo().assertIsEnabled().assertIsOn().performClick()
+        org.mockito.Mockito.verify(actions).setBuzzerEnabled(false)
+        // The native switch still shows the confirmed device value until the controller acknowledges it.
+        compose.onNodeWithContentDescription("Buzzer").assertIsOn()
+    }
+
+    @Test fun homeAutoSwitchChangesModeInsteadOfOnlyOpeningControls() {
+        var requestedAuto: Boolean? = null
+        compose.runOnUiThread {
+            compose.activity.setContent {
+                SmartDryingRackTheme {
+                    Surface {
+                        com.example.smartdryingrack.feature.home.HomeScreen(
+                            com.example.smartdryingrack.feature.home.HomeUiState(),
+                            onControl = { error("Auto toggle should not navigate instead of changing mode") },
+                            onAutoModeChange = { requestedAuto = it })
+                    }
+                }
+            }
+        }
+        compose.onNodeWithContentDescription("Auto mode OFF").performScrollTo().performClick()
+        compose.runOnIdle { org.junit.Assert.assertEquals(true, requestedAuto) }
     }
 
     @Test fun largeTextLightDashboardKeepsConnectionActionAccessible() {

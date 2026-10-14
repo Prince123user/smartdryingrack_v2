@@ -90,6 +90,21 @@ class AutomationTest {
         assertFalse(d.onReading(false))
     }
 
+    @Test fun dryReadingCannotReuseLatchedRainConfirmationForRetraction() {
+        val debouncer = RainDebouncer(3)
+        repeat(3) { debouncer.onReading(true) }
+        assertTrue(debouncer.permitsRainRetraction(true))
+        // Hysteresis retains the old confirmation, but current dry telemetry must not move the rack.
+        assertTrue(debouncer.onReading(false))
+        assertFalse(debouncer.permitsRainRetraction(false))
+    }
+
+    @Test fun dryAutoWithScheduleOffNeverRequestsRetraction() {
+        RackState.entries.forEach { state ->
+            assertEquals(RackAction.NONE, engine.decide(input(state = state)).action)
+        }
+    }
+
     @Test fun sensorValidation() {
         val ok = SensorData(30f, 60f, false, 50, 0L)
         assertTrue(ok.isValid)
@@ -99,8 +114,16 @@ class AutomationTest {
         assertFalse(ok.copy(temperature = Float.NaN).isValid)
     }
 
+    @Test fun schedulesAreOffUntilExplicitlyEnabled() {
+        val schedule = RackSchedule()
+        assertFalse(schedule.enabled)
+        val monday = LocalDate.of(2026, 10, 5)
+        assertNull(schedule.wantsRackOut(monday.atTime(7, 59)))
+        assertNull(schedule.wantsRackOut(monday.atTime(18, 0)))
+    }
+
     @Test fun scheduleWindow() {
-        val s = RackSchedule()
+        val s = RackSchedule(enabled = true)
         val monday = LocalDate.of(2026, 10, 5)
         assertEquals(false, s.wantsRackOut(monday.atTime(7, 59)))
         assertEquals(true, s.wantsRackOut(monday.atTime(8, 0)))

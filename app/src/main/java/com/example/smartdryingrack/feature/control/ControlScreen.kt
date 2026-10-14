@@ -109,8 +109,19 @@ fun ControlScreen(state: ControlUiState, actions: ControlActions) {
             MovementAction("Retract", Icons.Outlined.KeyboardDoubleArrowDown,
                 state.availability.retract == null, { actions.send(RackAction.RETRACT) }, Modifier.weight(1f))
         }
-        com.example.smartdryingrack.core.designsystem.NeonToggleRow("Buzzer", "Firmware sound control is unavailable",
-            Icons.Outlined.VolumeUp, checked = false, enabled = false)
+        com.example.smartdryingrack.core.designsystem.NeonToggleRow("Buzzer", when {
+            state.buzzerUpdating -> "Waiting for device confirmation…"
+            state.buzzerEnabled == null -> "Requires updated ESP32 firmware (1.1.0+)"
+            state.buzzerEnabled -> "Sound enabled · toggle on to test a short beep"
+            else -> "Sound disabled"
+        }, Icons.Outlined.VolumeUp, checked = state.buzzerEnabled == true,
+            onChange = actions::setBuzzerEnabled,
+            enabled = state.connection == com.example.smartdryingrack.domain.model.ConnectionState.ONLINE && state.buzzerEnabled != null && !state.buzzerUpdating)
+        state.deviceMessage?.let { Text(it, color = AppColors.Warning, style = MaterialTheme.typography.bodySmall) }
+        state.rainRaw?.let { Text("Rain sensor raw: $it · check dry/wet calibration",
+            style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary) }
+        state.motionReason?.let { Text("Device movement reason: " + it.lowercase().replace('_', ' '),
+            style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary) }
         RackControlButton("Stop", { actions.send(RackAction.STOP) },
             enabled = state.availability.stop == null, modifier = Modifier.fillMaxWidth(), accent = AppColors.Warning)
 

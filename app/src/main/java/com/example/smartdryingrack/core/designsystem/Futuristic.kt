@@ -25,6 +25,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.smartdryingrack.R
@@ -197,6 +198,7 @@ fun NeonToggleRow(title: String, description: String, icon: ImageVector, checked
                 Text(description, style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
             }
             Switch(checked = checked, onCheckedChange = onChange, enabled = enabled,
+                modifier = Modifier.semantics { contentDescription = title },
                 colors = SwitchDefaults.colors(checkedTrackColor = AppColors.Primary,
                     checkedThumbColor = Color.White, uncheckedTrackColor = AppColors.Card,
                     uncheckedBorderColor = AppColors.Border,

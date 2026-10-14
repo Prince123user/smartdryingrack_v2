@@ -115,6 +115,11 @@ class RackRepository @Inject constructor(
         }
 
         val sensor = sensorData.value
+        if (action == RackAction.RETRACT && source == CommandSource.RAIN &&
+            (sensor == null || !sensor.isValid || System.currentTimeMillis() - sensor.timestamp !in 0..6000 ||
+                !sensor.rainDetected || !rainConfirmed.value)) {
+            return CommandResult.Rejected(RejectReason.ERROR)
+        }
         if (action == RackAction.EXTEND && (sensor == null || !sensor.isValid ||
                 System.currentTimeMillis() - sensor.timestamp !in 0..6000 || sensor.rainDetected || rainConfirmed.value)) {
             return CommandResult.Rejected(RejectReason.ERROR)

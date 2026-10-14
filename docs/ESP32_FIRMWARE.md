@@ -32,16 +32,21 @@ Successful response, HTTP 200:
 ```json
 {
   "state":"RETRACTED",
-  "firmwareVersion":"1.0.0",
+  "firmwareVersion":"1.1.0",
   "sensors": {
     "temperature":29.5,
     "humidity":64.0,
     "rainDetected":false,
-    "clothesDryPercentage":null
+    "clothesDryPercentage":null,
+    "rainRaw":3300
   },
   "positionSource":"COMMAND_ESTIMATE",
   "positionMeasured":false,
-  "rainProtectionEnabled":true
+  "rainProtectionEnabled":true,
+  "buzzerEnabled":true,
+  "motionReason":"BOOT_HOMING",
+  "rainThreshold":1900,
+  "rainWetWhenAnalogBelow":true
 }
 ```
 
@@ -65,7 +70,17 @@ Actions are `EXTEND`, `RETRACT`, and `STOP`. Accepted commands return HTTP 200:
 
 Rejected commands return HTTP 409 with `accepted:false` and a reason. The request ID is cached for ten minutes, so a duplicate request receives the same response without moving the servo twice.
 
-The app does not currently send a mode, buzzer, rain-protection, or rain-sensitivity API request. Those settings therefore remain firmware constants in the sketch. There is no existing mobile endpoint for them; adding a `/api/config` endpoint would require a coordinated Android change and is intentionally not claimed as app compatibility.
+### `POST /api/buzzer` (firmware 1.1.0+)
+
+```json
+{"enabled":false,"requestId":"buzzer-001"}
+```
+
+The response is `{"accepted":true,"buzzerEnabled":false}`. The app changes its displayed setting only after a matching acknowledgement, then keeps it synchronized with status polling. Disabling stops the buzzer immediately. Enabling emits a short test beep. The enabled flag persists in ESP32 NVS; duplicate request IDs do not beep twice. The specified hardware is a passive buzzer on GPIO19.
+
+**Update both the Android APK and this sketch.** Older firmware lacks this endpoint; the app leaves the switch disabled and explains that an update is required.
+
+The app still does not send mode, rain-protection, or physical rain-threshold settings. Those remain local firmware configuration. The Home Auto switch now changes the app's local mode rather than just navigating to Controls. Selecting Auto with a dry sensor and schedules off sends no movement request.
 
 The sketch has a firmware-only `STARTUP_MODE` (`MODE_AUTO` or `MODE_MANUAL`) and reports it as an extra `mode` field. Since the current app never sends a mode, changing the app’s local Auto/Manual control does not change this ESP32 variable. Movement commands remain compatible in either mode, while confirmed rain protection always has priority.
 
@@ -96,7 +111,7 @@ The Android app accepts plain HTTP only for a private IPv4 address. Do not port-
 
 1. Disconnect the servo horn or clear the mechanism. Set `RETRACT_ANGLE` to the mechanically sheltered endpoint and `EXTEND_ANGLE` to the drying endpoint. Keep both between 0 and 180 degrees.
 2. Set `SERVO_SPEED_DEG_PER_SECOND` so the configured travel time is below the physical travel limit. Increase `MAX_MOTION_TIME_MS` only after checking the mechanism; it is a safety timeout, not a position measurement.
-3. Open Serial Monitor and temporarily add a `Serial.println(lastRainRaw)` in `readRainWet()` if you need to observe AO. Record dry and wet ADC values. Set `RAIN_WET_WHEN_ANALOG_BELOW`, `RAIN_THRESHOLD`, and `RAIN_HYSTERESIS` between those values. If using DO, set `USE_RAIN_DIGITAL_OUTPUT` and `RAIN_DIGITAL_ACTIVE_LOW` instead.
+3. Read `sensors.rainRaw` from `/api/status` or the updated app Controls screen to observe AO. Record dry and wet ADC values. Set `RAIN_WET_WHEN_ANALOG_BELOW`, `RAIN_THRESHOLD`, and `RAIN_HYSTERESIS` between those values. If using DO, set `USE_RAIN_DIGITAL_OUTPUT` and `RAIN_DIGITAL_ACTIVE_LOW` instead.
 4. Leave `RAIN_CONFIRM_READINGS` at 3 and `RAIN_CLEAR_READINGS` at 5 initially. This confirms rain after three wet samples and clears only after five dry samples, preventing relay-like movement from fluctuating water readings.
 5. Confirm DHT22 readings are plausible before testing movement. A failed DHT sample makes the API unavailable and blocks extension, while the local rain loop keeps running.
 6. Test `RETRACT`, `EXTEND`, and `STOP` with the rack unloaded. Test rain while the phone and Wi-Fi are disconnected. Verify a physical emergency stop, mechanical end stops, and obstruction protection before enabling unattended use.
@@ -111,3 +126,22 @@ curl -X POST http://192.168.1.50/api/commands \
   -H 'Content-Type: application/json' \
   -d '{"action":"RETRACT","requestId":"commission-001"}'
 ```
+
+## Unexpected retraction diagnosis
+
+`motionReason` identifies the last device movement trigger: `BOOT_HOMING`, `RAIN_PROTECTION`, or `REST_COMMAND`. Boot homing remains enabled because this hardware has no position sensor; reconnecting the app does not itself home the servo. Repeated `GET /api/status` requests never move it.
+
+The app now requires a fresh, currently wet reading plus rain confirmation before issuing rain-triggered retraction. An old wet debounce latch cannot issue retraction after the device reports dry. Scheduled and explicitly requested movements remain separate.
+
+If a dry rack still retracts, capture `motionReason`, `sensors.rainDetected`, `sensors.rainRaw`, and `rainThreshold` immediately afterwards. `BOOT_HOMING` indicates a reboot/startup; `RAIN_PROTECTION` points to physical sensor calibration; `REST_COMMAND` indicates a client command. Record raw dry and wet values before changing threshold or polarity. Do not disable rain protection to hide the symptom.
+
+## Validation
+
+Android build, unit/UI tests and lint cover the new endpoint, acknowledged setting state, dry-rain command blocking, and functional Home Auto/Buzzer switches. Host firmware logic tests execute the real sketch with substitutes for GPIO, HTTP and NVS:
+
+```bash
+g++ -std=c++17 -Ifirmware/tests/stubs firmware/tests/firmware_test.cpp -o /tmp/smart-rack-firmware-test
+/tmp/smart-rack-firmware-test
+```
+
+These are not physical hardware tests or an ESP32 target compile. The cloud target build currently requires allowing `downloads.arduino.cc` in environment network settings; the domain addition is saved in the environment draft for review/save/publication. Compile and upload with the documented ESP32 board/libraries in Arduino IDE, retaining your own Wi-Fi credentials and calibrated servo angles.

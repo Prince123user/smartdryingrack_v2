@@ -70,6 +70,31 @@ class RackApiTest {
         assertTrue(command.getString("requestId").isNotBlank())
     }
 
+    @Test fun buzzerChangesRequireMatchingDeviceAcknowledgement() = withServer { server, url ->
+        server.enqueue(MockResponse().setBody("{\"accepted\":true,\"buzzerEnabled\":false}"))
+        assertFalse(api().setBuzzer(url, false))
+        val request = server.takeRequest()
+        assertEquals("/api/buzzer", request.path)
+        assertEquals("POST", request.method)
+        val body = JSONObject(request.body.readUtf8())
+        assertFalse(body.getBoolean("enabled"))
+        assertTrue(body.getString("requestId").isNotBlank())
+        server.enqueue(MockResponse().setBody("{\"accepted\":true,\"buzzerEnabled\":false}"))
+        assertThrows(java.io.IOException::class.java) { api().setBuzzer(url, true) }
+    }
+
+    @Test fun firmwareSettingsAndRawRainReadingsAreParsedWithoutInventingSupport() {
+        val json = JSONObject(status).put("buzzerEnabled", true).put("motionReason", "RAIN_PROTECTION")
+        json.getJSONObject("sensors").put("rainRaw", 3300)
+        val parsed = parseRackSnapshot(json.toString(), 123L)
+        assertEquals(true, parsed.buzzerEnabled)
+        assertEquals(3300, parsed.rainRaw)
+        assertEquals("RAIN_PROTECTION", parsed.motionReason)
+        assertNull(parseRackSnapshot(status, 123L).buzzerEnabled)
+        json.put("buzzerEnabled", "true")
+        assertThrows(IllegalArgumentException::class.java) { parseRackSnapshot(json.toString(), 123L) }
+    }
+
     @Test fun rejectionDoesNotRetryMotorCommand() = withServer { server, url ->
         server.enqueue(MockResponse().setResponseCode(503))
         val error = assertThrows(java.io.IOException::class.java) { api().command(url, "RETRACT") }

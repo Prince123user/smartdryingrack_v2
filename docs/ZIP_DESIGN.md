@@ -6,7 +6,7 @@ The native Android app uses the supplied imagery directly. `ReferenceArtwork` re
 
 Applied screens: splash; introduction; monitoring and rain-protection onboarding; connection and validated connection success; home; manual controls; alerts; notifications; history; settings; device settings; notification settings; automation. References 16 and 17 establish that onboarding has no bottom navigation. Existing light theme and larger-text scrolling remain supported. The app now opens directly to Home; onboarding remains implemented as an optional flow. Settings keeps the primary tabs available, and its Back button returns to the screen that opened it.
 
-Sample temperature/humidity values appear only on the monitoring tutorial and are explicitly marked illustrative. Dashboard telemetry, rack position, connection, firmware, history, and events remain real. Unsupported sound/buzzer controls are shown disabled. Rain safety remains enabled; its sensitivity slider uses the existing persisted automation setting. Physical Wi-Fi network naming, sound notifications, and ESP32 hardware verification are outside this visual change.
+Sample temperature/humidity values appear only on the monitoring tutorial and are explicitly marked illustrative. Dashboard telemetry, rack position, connection, firmware, history, and events remain real. System notification sound remains unavailable. The buzzer switch works with firmware 1.1.0+ and stays disabled on older firmware. Rain safety remains enabled; physical sensor calibration is displayed using device raw readings; forecast sensitivity remains in advanced settings. Physical Wi-Fi network naming, sound notifications, and ESP32 hardware verification are outside this visual change.
 
 Validate from the repository root:
 

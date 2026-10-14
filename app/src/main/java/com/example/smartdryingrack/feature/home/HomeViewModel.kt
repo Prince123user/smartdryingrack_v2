@@ -42,6 +42,8 @@ class HomeViewModel @Inject constructor(
 
     private val _message = MutableStateFlow<String?>(null)
     val message = _message.asStateFlow()
+    fun setAutoMode(enabled: Boolean) { rack.setMode(if (enabled) RackMode.AUTO else RackMode.MANUAL) }
+
     fun retract() { viewModelScope.launch {
         _message.value = when (rack.send(RackAction.RETRACT, CommandSource.MANUAL)) {
             CommandResult.Accepted -> "Retraction accepted. Waiting for telemetry."

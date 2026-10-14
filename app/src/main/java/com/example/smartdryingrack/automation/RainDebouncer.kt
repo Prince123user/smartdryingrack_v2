@@ -7,6 +7,8 @@ class RainDebouncer(private val required: Int = 3) {
     var confirmed = false
         private set
 
+    fun permitsRainRetraction(currentWet: Boolean): Boolean = confirmed && currentWet
+
     fun reset() { rainCount = 0; dryCount = 0; confirmed = false }
 
     fun onReading(rain: Boolean): Boolean {

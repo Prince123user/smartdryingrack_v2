@@ -27,7 +27,8 @@ fun normalizeRackUrl(value: String): String {
     return uri.toString().trimEnd('/')
 }
 
-data class RackSnapshot(val state: RackState, val sensors: SensorData, val firmware: String?)
+data class RackSnapshot(val state: RackState, val sensors: SensorData, val firmware: String?,
+                        val buzzerEnabled: Boolean? = null, val rainRaw: Int? = null, val motionReason: String? = null)
 
 fun parseRackSnapshot(body: String, receivedAt: Long): RackSnapshot {
     val json = JSONObject(body)
@@ -45,7 +46,12 @@ fun parseRackSnapshot(body: String, receivedAt: Long): RackSnapshot {
         timestamp = receivedAt
     )
     require(data.isValid) { "The rack returned invalid sensor readings." }
-    return RackSnapshot(state, data, json.optString("firmwareVersion").takeIf { it.isNotBlank() })
+    val buzzer = json.opt("buzzerEnabled").takeUnless { it == JSONObject.NULL }
+    require(buzzer == null || buzzer is Boolean) { "Invalid buzzer setting." }
+    val raw = sensors.opt("rainRaw").takeUnless { it == JSONObject.NULL }
+    require(raw == null || raw is Number && raw.toDouble() in 0.0..4095.0 && raw.toDouble() % 1.0 == 0.0) { "Invalid rain sensor reading." }
+    return RackSnapshot(state, data, json.optString("firmwareVersion").takeIf { it.isNotBlank() },
+        buzzer as Boolean?, (raw as Number?)?.toInt(), json.optString("motionReason").takeIf { it.isNotBlank() })
 }
 
 /** Never retries a motor command; firmware must deduplicate its requestId. */
@@ -58,6 +64,15 @@ class RackApi(private val connectionFactory: (URL) -> HttpURLConnection = { it.o
         val body = JSONObject().put("action", action).put("requestId", UUID.randomUUID().toString()).toString()
         val response = JSONObject(request(baseUrl, "/api/commands", body))
         if (!response.getBoolean("accepted")) throw IOException("The rack rejected the command.")
+    }
+
+    fun setBuzzer(baseUrl: String, enabled: Boolean): Boolean {
+        val body = JSONObject().put("enabled", enabled).put("requestId", UUID.randomUUID().toString()).toString()
+        val response = JSONObject(request(baseUrl, "/api/buzzer", body))
+        if (response.opt("accepted") != true || response.opt("buzzerEnabled") !is Boolean || response.getBoolean("buzzerEnabled") != enabled) {
+            throw IOException("The rack did not confirm the requested buzzer setting. Update the ESP32 firmware.")
+        }
+        return response.getBoolean("buzzerEnabled")
     }
 
     private fun request(baseUrl: String, path: String, body: String? = null): String {
