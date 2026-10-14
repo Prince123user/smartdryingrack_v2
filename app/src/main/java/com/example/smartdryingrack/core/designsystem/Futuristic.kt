@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -41,9 +42,12 @@ fun CircuitBackground(modifier: Modifier = Modifier) {
 
 @Composable
 fun NeonIcon(icon: ImageVector, color: Color = AppColors.Primary, modifier: Modifier = Modifier) {
-    Box(modifier.size(36.dp).clip(RoundedCornerShape(10.dp))
+    Box(modifier.size(40.dp)
+        .shadow(if (LocalDarkTheme.current) 6.dp else 1.dp, RoundedCornerShape(12.dp), clip = false,
+            ambientColor = color.copy(alpha = .12f), spotColor = color.copy(alpha = .18f))
+        .clip(RoundedCornerShape(12.dp))
         .background(Brush.radialGradient(listOf(color.copy(alpha = .28f), color.copy(alpha = .04f))))
-        .border(1.dp, color.copy(alpha = .25f), RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+        .border(1.dp, color.copy(alpha = .22f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
         Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(25.dp))
     }
 }
@@ -60,7 +64,7 @@ fun DeviceConnectionCard(connection: ConnectionState, onClick: () -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             NeonIcon(Icons.Outlined.Wifi, accent)
             Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f).padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(stringResource(connection.labelRes()), fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                 Text(when (connection) {
                     ConnectionState.ONLINE -> "Your rack is online"
@@ -78,8 +82,15 @@ fun DeviceConnectionCard(connection: ConnectionState, onClick: () -> Unit) {
 fun RackHero(state: RackState, modifier: Modifier = Modifier, showPosition: Boolean = true) {
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val height = maxWidth * .77f
-        Box(Modifier.fillMaxWidth().height(height + if (showPosition) 26.dp else 0.dp)) {
-            ReferenceRack(Modifier.fillMaxWidth().height(height))
+        Box(Modifier.fillMaxWidth().height(height + if (showPosition) 32.dp else 0.dp)) {
+            val shape = RoundedCornerShape(16.dp)
+            Box(Modifier.fillMaxWidth().height(height)
+                .shadow(if (LocalDarkTheme.current) 10.dp else 4.dp, shape, clip = false)
+                .clip(shape).border(1.dp, AppColors.BorderSubtle.copy(alpha = .6f), shape)) {
+                ReferenceRack(Modifier.fillMaxSize())
+                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent,
+                    Color.Transparent, AppColors.Background.copy(alpha = .45f)))))
+            }
             if (showPosition) {
                 Text(stringResource(state.labelRes()), modifier = Modifier.align(Alignment.BottomCenter).padding(4.dp),
                     style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
@@ -91,15 +102,16 @@ fun RackHero(state: RackState, modifier: Modifier = Modifier, showPosition: Bool
 @Composable
 fun NeonAction(label: String, icon: ImageVector, onClick: () -> Unit, enabled: Boolean = true,
                modifier: Modifier = Modifier, accent: Color = AppColors.Primary) {
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RoundedCornerShape(12.dp)
     val activeColor = if (enabled) accent else AppColors.Border
-    Box(modifier.heightIn(min = 48.dp)
-        .shadow(if (enabled && LocalDarkTheme.current) 9.dp else 0.dp, shape, ambientColor = activeColor, spotColor = activeColor)
+    Box(modifier.heightIn(min = Dimens.ButtonHeight)
+        .shadow(if (enabled) 10.dp else 0.dp, shape, clip = false,
+            ambientColor = activeColor.copy(alpha = .20f), spotColor = activeColor.copy(alpha = .35f))
         .clip(shape)
-        .background(Brush.verticalGradient(if (enabled) listOf(activeColor, Color(0xFF007EA6), Color(0xFF003C63), activeColor.copy(alpha = .85f)) else listOf(AppColors.Card, AppColors.Card)))
-        .border(1.dp, activeColor, shape)
+        .background(Brush.verticalGradient(if (enabled) listOf(lerp(activeColor, Color.White, .12f), lerp(activeColor, Color.Black, .35f), lerp(activeColor, Color.Black, .58f)) else listOf(AppColors.Card, AppColors.Card)))
+        .border(1.dp, if (enabled) lerp(activeColor, Color.White, .30f) else AppColors.Border.copy(alpha = .6f), shape)
         .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-        .padding(horizontal = 10.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
+        .padding(horizontal = 16.dp, vertical = 14.dp), contentAlignment = Alignment.Center) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             val trailing = icon == Icons.Outlined.ArrowForward
             if (!trailing) Icon(icon, contentDescription = null, tint = if (enabled) Color.White else AppColors.TextTertiary)
@@ -120,7 +132,7 @@ fun NeonFeatureRow(title: String, description: String, icon: ImageVector, onClic
         Row(verticalAlignment = Alignment.CenterVertically) {
             NeonIcon(icon, accent)
             Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f).padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(title, color = AppColors.TextPrimary, fontWeight = FontWeight.SemiBold)
                 Text(description, color = AppColors.TextSecondary, style = MaterialTheme.typography.bodySmall)
             }
@@ -157,12 +169,15 @@ fun EmptyStateCard(title: String, message: String, icon: ImageVector,
 
 @Composable
 fun MovementAction(label: String, icon: ImageVector, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(14.dp)
     val accent = if (enabled) AppColors.Primary else AppColors.Border
-    Column(modifier.heightIn(min = 78.dp).clip(shape)
+    Column(modifier.heightIn(min = 88.dp)
+        .shadow(if (enabled) 8.dp else 0.dp, shape, clip = false,
+            ambientColor = accent.copy(alpha = .16f), spotColor = accent.copy(alpha = .28f))
+        .clip(shape)
         .background(Brush.verticalGradient(listOf(accent.copy(alpha = .26f), AppColors.Card)))
         .border(1.dp, accent.copy(alpha = if (enabled) .8f else .6f), shape)
-        .clickable(enabled = enabled, role = Role.Button, onClick = onClick).padding(12.dp),
+        .clickable(enabled = enabled, role = Role.Button, onClick = onClick).padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Icon(icon, contentDescription = null, tint = if (enabled) AppColors.Primary else AppColors.TextTertiary, modifier = Modifier.size(30.dp))
         Text(label, color = if (enabled) AppColors.TextPrimary else AppColors.TextTertiary,
@@ -177,7 +192,7 @@ fun NeonToggleRow(title: String, description: String, icon: ImageVector, checked
         Row(verticalAlignment = Alignment.CenterVertically) {
             NeonIcon(icon)
             Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f).padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(title, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                 Text(description, style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
             }

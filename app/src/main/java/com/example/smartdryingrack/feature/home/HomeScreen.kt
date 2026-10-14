@@ -33,8 +33,8 @@ fun HomeScreen(state: HomeUiState, onConnect: () -> Unit = {}, onControl: () -> 
         DeviceConnectionCard(state.connection, onConnect)
         RackHero(state.rackState, showPosition = false)
         RackStatusCard(state.rackState, state.rainConfirmed, null)
-        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp), maxItemsInEachRow = if (androidx.compose.ui.platform.LocalConfiguration.current.fontScale > 1.3f) 1 else 3) {
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp), maxItemsInEachRow = if (androidx.compose.ui.platform.LocalConfiguration.current.fontScale > 1.3f) 1 else 3) {
             MiniSensor("Temperature", sensors?.let { "${it.temperature.roundToInt()}°C" } ?: "—", Icons.Outlined.Thermostat,
                 Color(0xFFFF687C), Modifier.weight(1f))
             MiniSensor("Humidity", sensors?.let { "${it.humidity.roundToInt()}%" } ?: "—", Icons.Outlined.WaterDrop,
@@ -74,7 +74,7 @@ private fun MiniSensor(label: String, value: String, icon: androidx.compose.ui.g
     GlassCard(modifier, color) {
         androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth(), horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
         Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(30.dp))
-        Spacer(Modifier.height(5.dp))
+        Spacer(Modifier.height(8.dp))
         Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
         Text(label, style = MaterialTheme.typography.labelSmall, color = AppColors.TextSecondary)
         }

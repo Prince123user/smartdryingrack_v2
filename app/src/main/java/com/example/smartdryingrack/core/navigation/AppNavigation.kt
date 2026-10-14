@@ -217,7 +217,10 @@ private fun NavHostController.returnToPreviousScreen() {
 private fun NeonNavigation(current: String?, onNavigate: (Destination) -> Unit) {
     val shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     val cyan = AppColors.Primary
-    Row(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(AppColors.Card, AppColors.Background)))
+    Row(Modifier.fillMaxWidth().shadow(14.dp, shape, clip = false,
+        ambientColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = .45f),
+        spotColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = .6f))
+        .clip(shape).background(Brush.verticalGradient(listOf(AppColors.Card, AppColors.Background)))
         .border(1.dp, cyan.copy(alpha = .24f), shape).navigationBarsPadding().padding(horizontal = 8.dp, vertical = 6.dp)) {
         Destination.entries.forEach { destination ->
             val selected = current == destination.route
@@ -225,7 +228,7 @@ private fun NeonNavigation(current: String?, onNavigate: (Destination) -> Unit) 
             val destinationLabel = stringResource(destination.label)
             Column(Modifier.weight(1f).heightIn(min = 56.dp)
                 .clip(RoundedCornerShape(14.dp))
-                .background(if (selected) androidx.compose.ui.graphics.Color.Transparent else androidx.compose.ui.graphics.Color.Transparent)
+                .background(if (selected) cyan.copy(alpha = .09f) else androidx.compose.ui.graphics.Color.Transparent)
                 .selectable(selected, role = Role.Tab, onClick = { onNavigate(destination) })
                 .semantics(mergeDescendants = true) {
                     contentDescription = destinationLabel

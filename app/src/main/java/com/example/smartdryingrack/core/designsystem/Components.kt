@@ -90,7 +90,7 @@ fun RackState.labelRes(): Int = when (this) {
 fun ScreenColumn(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Box(modifier.fillMaxSize()) {
         CircuitBackground()
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Dimens.ScreenPadding),
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = Dimens.ScreenPadding, end = Dimens.ScreenPadding, top = 16.dp, bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(Dimens.Gap), content = content)
     }
 }
@@ -104,11 +104,11 @@ fun GlassCard(
     val shape = MaterialTheme.shapes.large
     Column(
         modifier
-            .shadow(if (LocalDarkTheme.current) 6.dp else 1.dp, shape,
-                ambientColor = accent.copy(alpha = .12f), spotColor = accent.copy(alpha = .12f))
+            .shadow(if (LocalDarkTheme.current) 10.dp else 3.dp, shape, clip = false,
+                ambientColor = Color.Black.copy(alpha = .45f), spotColor = Color.Black.copy(alpha = .65f))
             .clip(shape)
-            .background(Brush.linearGradient(listOf(AppColors.CardAlt.copy(alpha = .95f), AppColors.Card.copy(alpha = .94f))))
-            .border(1.dp, accent.copy(alpha = if (LocalDarkTheme.current) .38f else .2f), shape)
+            .background(Brush.verticalGradient(listOf(AppColors.CardAlt.copy(alpha = .98f), AppColors.Card.copy(alpha = .98f))))
+            .border(1.dp, accent.copy(alpha = if (LocalDarkTheme.current) .28f else .18f), shape)
             .padding(Dimens.CardPadding),
         content = content
     )
