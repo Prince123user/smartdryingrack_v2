@@ -55,6 +55,7 @@ import com.example.smartdryingrack.core.designsystem.SmartDryingRackTheme
 import com.example.smartdryingrack.feature.alerts.AlertsRoute
 import com.example.smartdryingrack.feature.alerts.NotificationsScreen
 import com.example.smartdryingrack.feature.control.ControlRoute
+import com.example.smartdryingrack.feature.lighting.HouseLightsRoute
 import com.example.smartdryingrack.feature.history.HistoryRoute
 import com.example.smartdryingrack.feature.home.HomeRoute
 import com.example.smartdryingrack.feature.onboarding.DeviceSetupScreen
@@ -101,18 +102,18 @@ fun SmartDryingRackRoot(viewModel: SettingsViewModel = hiltViewModel(), startDes
             nav.navigateToTab(Destination.HOME)
         }
 
-        val showBottomBar = current in Destination.entries.map { it.route } || current == "settings"
-        val showTopBar = current in Destination.entries.map { it.route } || current == "settings"
+        val showBottomBar = current in Destination.entries.map { it.route } || current in listOf("settings", "house_lights")
+        val showTopBar = current in Destination.entries.map { it.route } || current in listOf("settings", "house_lights")
 
         Scaffold(
             containerColor = AppColors.Background,
             topBar = {
                 if (showTopBar) {
                     TopAppBar(
-                        title = { Text(when (current) { "history" -> "History"; "settings" -> "Settings"; else -> "Smart Drying Rack" }, color = AppColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+                        title = { Text(when (current) { "history" -> "History"; "settings" -> "Settings"; "house_lights" -> "House Lights"; else -> "Smart Drying Rack" }, color = AppColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp) },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = AppColors.Background),
                         navigationIcon = {
-                            if (current == "settings") IconButton(onClick = { nav.returnToPreviousScreen() }) {
+                            if (current in listOf("settings", "house_lights")) IconButton(onClick = { nav.returnToPreviousScreen() }) {
                                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back", tint = AppColors.TextPrimary)
                             }
                         },
@@ -169,9 +170,10 @@ fun SmartDryingRackRoot(viewModel: SettingsViewModel = hiltViewModel(), startDes
                         }
                     )
                 }
-                composable(Destination.HOME.route) { HomeRoute(onConnect = { nav.navigate("device_settings") }, onControl = { nav.navigateToTab(Destination.CONTROL) }) }
-                composable(Destination.CONTROL.route) { ControlRoute() }
+                composable(Destination.HOME.route) { HomeRoute(onConnect = { nav.navigate("device_settings") }, onControl = { nav.navigateToTab(Destination.CONTROL) }, onHouseLights = { nav.navigate("house_lights") { launchSingleTop = true } }) }
+                composable(Destination.CONTROL.route) { ControlRoute(onHouseLights = { nav.navigate("house_lights") { launchSingleTop = true } }) }
                 composable(Destination.ALERTS.route) { AlertsRoute() }
+                composable("house_lights") { HouseLightsRoute() }
                 composable("notifications") {
                     NotificationsScreen(onBack = { nav.returnToPreviousScreen() })
                 }

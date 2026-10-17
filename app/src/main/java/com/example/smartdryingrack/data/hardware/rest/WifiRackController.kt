@@ -15,6 +15,8 @@ import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
+data class RackConnectionSession(val address: String, val generation: Long)
+
 @Singleton
 class WifiRackController internal constructor(
     private val preferences: DevicePreferences,
@@ -40,6 +42,8 @@ class WifiRackController internal constructor(
     val rainRaw = _rainRaw.asStateFlow()
     private val _motionReason = MutableStateFlow<String?>(null)
     val motionReason = _motionReason.asStateFlow()
+    private val _requestedSession = MutableStateFlow<RackConnectionSession?>(null)
+    val requestedSession = _requestedSession.asStateFlow()
     private var polling: Job? = null
     @Volatile private var generation = 0L
     @Volatile private var activeAddress = ""
@@ -74,6 +78,7 @@ class WifiRackController internal constructor(
         connection.value = ConnectionState.CONNECTING
         activeAddress = address
         val session = generation
+        _requestedSession.value = RackConnectionSession(address, session)
         polling = scope.launch {
             while (isActive && session == generation) {
                 try {
@@ -106,6 +111,7 @@ class WifiRackController internal constructor(
     private fun reset() {
         generation++
         activeAddress = ""
+        _requestedSession.value = null
         polling?.cancel()
         polling = null
         connection.value = ConnectionState.OFFLINE

@@ -17,20 +17,21 @@ import com.example.smartdryingrack.domain.model.*
 import kotlin.math.roundToInt
 
 @Composable
-fun HomeRoute(onConnect: () -> Unit = {}, onControl: () -> Unit = {}, viewModel: HomeViewModel = hiltViewModel()) {
+fun HomeRoute(onConnect: () -> Unit = {}, onControl: () -> Unit = {}, onHouseLights: () -> Unit = {}, viewModel: HomeViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
-    HomeScreen(state, onConnect, onControl, viewModel::retract, message, viewModel::setAutoMode)
+    HomeScreen(state, onConnect, onControl, viewModel::retract, message, viewModel::setAutoMode, onHouseLights)
 }
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(state: HomeUiState, onConnect: () -> Unit = {}, onControl: () -> Unit = {},
-               onRetract: () -> Unit = {}, message: String? = null, onAutoModeChange: ((Boolean) -> Unit)? = null) {
+               onRetract: () -> Unit = {}, message: String? = null, onAutoModeChange: ((Boolean) -> Unit)? = null, onHouseLights: () -> Unit = {}) {
     val sensors = state.sensorData?.takeIf { it.isValid }
     val online = state.connection == ConnectionState.ONLINE
     ScreenColumn {
         DeviceConnectionCard(state.connection, onConnect)
+        NeonFeatureRow("House Lights", "Six RGB zones · automatic system status", Icons.Outlined.Lightbulb, onHouseLights)
         RackHero(state.rackState, showPosition = false)
         RackStatusCard(state.rackState, state.rainConfirmed, null)
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp),

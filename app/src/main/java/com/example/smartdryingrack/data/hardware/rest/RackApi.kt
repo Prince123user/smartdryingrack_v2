@@ -54,6 +54,8 @@ fun parseRackSnapshot(body: String, receivedAt: Long): RackSnapshot {
         buzzer as Boolean?, (raw as Number?)?.toInt(), json.optString("motionReason").takeIf { it.isNotBlank() })
 }
 
+class RackHttpException(val statusCode: Int) : IOException("Rack returned HTTP $statusCode.")
+
 /** Never retries a motor command; firmware must deduplicate its requestId. */
 class RackApi(private val connectionFactory: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection }) {
     fun status(baseUrl: String): RackSnapshot =
@@ -75,12 +77,14 @@ class RackApi(private val connectionFactory: (URL) -> HttpURLConnection = { it.o
         return response.getBoolean("buzzerEnabled")
     }
 
-    private fun request(baseUrl: String, path: String, body: String? = null): String {
+    internal fun request(baseUrl: String, path: String, body: String? = null): String {
         val connection = connectionFactory(URI(normalizeRackUrl(baseUrl) + path).toURL())
         try {
             connection.connectTimeout = 2500
             connection.readTimeout = 2500
             connection.instanceFollowRedirects = false
+            connection.useCaches = false
+            connection.setRequestProperty("Cache-Control", "no-cache")
             connection.setRequestProperty("Accept", "application/json")
             connection.setRequestProperty("Connection", "close")
             if (body != null) {
@@ -91,7 +95,7 @@ class RackApi(private val connectionFactory: (URL) -> HttpURLConnection = { it.o
                 connection.setFixedLengthStreamingMode(bytes.size)
                 connection.outputStream.use { it.write(bytes) }
             }
-            if (connection.responseCode !in 200..299) throw IOException("Rack returned HTTP ${connection.responseCode}.")
+            if (connection.responseCode !in 200..299) throw RackHttpException(connection.responseCode)
             return connection.inputStream.bufferedReader().use {
                 val buffer = CharArray(65537)
                 var count = 0

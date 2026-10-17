@@ -268,4 +268,23 @@ class NavigationRenderTest {
         compose.onNodeWithText("32.0°C · latest reading").assertExists()
         capture("07-history-test-fixture")
     }
+    @Test fun houseLightsReturnsToHomeOrControlAndTabsKeepLooping() {
+        fun tab(label: String) = compose.onNode(hasContentDescription(label) and hasClickAction())
+        repeat(3) {
+            listOf("Home", "Control").forEach { source ->
+                tab(source).performClick()
+                compose.onNode(hasText("House Lights") and hasClickAction()).performScrollTo().performClick()
+                compose.onNodeWithText("Six independent RGB zones").assertExists()
+                compose.onNodeWithContentDescription("Front power").assertIsNotEnabled()
+                compose.onNodeWithContentDescription("Back").performClick()
+                tab(source).assertIsSelected()
+                compose.onNode(hasText("House Lights") and hasClickAction()).performScrollTo().performClick()
+                tab("History").performClick()
+                compose.onNodeWithText("Waiting for temperature history").assertExists()
+                compose.onNodeWithContentDescription("Settings").performClick()
+                tab("History").performClick(); tab("Home").performClick()
+                compose.onNodeWithText("Connect your ESP32 rack").assertExists()
+            }
+        }
+    }
 }

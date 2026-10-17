@@ -63,9 +63,9 @@ import java.time.format.TextStyle
 import java.util.Locale
 
 @Composable
-fun ControlRoute(viewModel: ControlViewModel = hiltViewModel()) {
+fun ControlRoute(onHouseLights: () -> Unit = {}, viewModel: ControlViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    ControlScreen(state, viewModel)
+    ControlScreen(state, viewModel, onHouseLights)
 }
 
 @StringRes
@@ -90,9 +90,10 @@ private fun RejectReason.res(): Int = when (this) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ControlScreen(state: ControlUiState, actions: ControlActions) {
+fun ControlScreen(state: ControlUiState, actions: ControlActions, onHouseLights: () -> Unit = {}) {
     ScreenColumn {
         ModeSelector(state.mode, actions::setMode, Modifier.fillMaxWidth())
+        com.example.smartdryingrack.core.designsystem.NeonFeatureRow("House Lights", "Control six independent RGB zones", Icons.Outlined.Lightbulb, onHouseLights)
 
         com.example.smartdryingrack.core.designsystem.RackHero(state.rackState)
         if (state.pendingMovement != null) {
