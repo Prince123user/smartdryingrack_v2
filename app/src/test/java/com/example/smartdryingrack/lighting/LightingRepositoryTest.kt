@@ -82,8 +82,8 @@ class LightingRepositoryTest {
         device.snapshot = device.snapshot.copy(version = 1, zones = device.snapshot.zones +
             (front to ConfirmedZone(update.settings, 1, "another-client")))
         advanceTimeBy(2001); runCurrent(); assertNotNull(repo.state.value.zones.getValue(front).pending)
-        device.snapshot = device.snapshot.copy(zones = device.snapshot.zones +
-            (front to ConfirmedZone(update.settings, 1, update.requestId)))
+        device.snapshot = device.snapshot.copy(version = 2, zones = device.snapshot.zones +
+            (front to ConfirmedZone(update.settings, 2, update.requestId)))
         advanceTimeBy(2000); runCurrent()
         zone = repo.state.value.zones.getValue(front)
         assertNull(zone.pending); assertFalse(zone.confirmed!!.settings.power)
@@ -159,4 +159,35 @@ class LightingRepositoryTest {
         assertEquals(LightingConnection.READY, repo.state.value.connection)
         assertNotNull(repo.state.value.indicator)
     }
+    @Test fun newerGlobalVersionCannotRollBackAnIndividualZone() = runTest {
+        val device = Device(); val repo = LightingRepository(device, backgroundScope)
+        repo.open("rack"); runCurrent(); repo.power(front, false); runCurrent()
+        val confirmed = repo.state.value.zones.getValue(front).confirmed
+        val valid = device.snapshot
+        // An indicator may advance the global version while a broken response contains old zone data.
+        device.snapshot = lightingFixture().copy(version = valid.version + 1)
+        advanceTimeBy(2001); runCurrent()
+        assertEquals(confirmed, repo.state.value.zones.getValue(front).confirmed)
+        assertEquals(valid.version, repo.state.value.version)
+        assertEquals(LightingConnection.ERROR, repo.state.value.connection)
+        device.snapshot = valid
+        advanceTimeBy(5001); runCurrent()
+        assertEquals(LightingConnection.READY, repo.state.value.connection)
+        assertEquals(confirmed, repo.state.value.zones.getValue(front).confirmed)
+    }
+
+    @Test fun unchangedZoneRevisionCannotReplaceValuesOrRequestIdentity() = runTest {
+        val device = Device(); val repo = LightingRepository(device, backgroundScope)
+        repo.open("rack"); runCurrent()
+        val confirmed = device.snapshot.zones.getValue(front)
+        listOf(confirmed.copy(settings = confirmed.settings.copy(brightness = 5)),
+            confirmed.copy(lastRequestId = "unexpected-request")).forEach { invalid ->
+            device.snapshot = device.snapshot.copy(version = device.snapshot.version + 1,
+                zones = device.snapshot.zones + (front to invalid))
+            advanceTimeBy(5001); runCurrent()
+            assertEquals(confirmed, repo.state.value.zones.getValue(front).confirmed)
+            assertEquals(LightingConnection.ERROR, repo.state.value.connection)
+        }
+    }
+
 }

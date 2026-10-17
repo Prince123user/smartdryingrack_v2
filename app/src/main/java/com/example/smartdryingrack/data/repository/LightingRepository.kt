@@ -101,6 +101,18 @@ class LightingRepository(private val api: LightingGateway, private val scope: Co
             if (!rebooted && old.version != null && snapshot.version < old.version) {
                 return
             }
+            if (!rebooted && old.deviceSession != null) {
+                // A newer global version (e.g. an indicator change) must not roll a zone back.
+                old.zones.forEach { (id, ui) ->
+                    ui.confirmed?.let { previous ->
+                        val next = snapshot.zones.getValue(id)
+                        require(next.revision >= previous.revision &&
+                            (next.revision != previous.revision || next == previous)) {
+                            "Inconsistent ${id.label} state: its revision regressed or changed without a new revision."
+                        }
+                    }
+                }
+            }
             if (rebooted) {
                 retiredBoots += old.deviceSession!!
                 commands.values.forEach { it.cancel() }

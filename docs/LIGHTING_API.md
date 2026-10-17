@@ -82,7 +82,7 @@ The proposed component applies one short, bounded driver transaction synchronous
 
 The mobile client also supports a future `202 Accepted` implementation, but this component has no command queue. A queued adapter would need its own per-zone serialization and reservation logic. Do not return success before driver application with the synchronous component.
 
-The app keeps confirmed state separate from the pending selection. ACK alone is insufficient: a fresh GET must show the same session, zone, request ID, exact power/brightness and revision ≥ the acknowledged revision. An old/mismatched ACK or an old snapshot cannot overwrite a newer selection.
+The app keeps confirmed state separate from the pending selection. ACK alone is insufficient: a fresh GET must show the same session, zone, request ID, exact power/brightness and revision ≥ the acknowledged revision. An old/mismatched ACK or an old snapshot cannot overwrite a newer selection. Even in a newer global snapshot, a zone revision must not regress, and its values/request identity cannot change without a new zone revision. Inconsistent responses leave the previous confirmed values intact, label them stale and report a connection error.
 
 The component caches the most recent 32 successful request identities across zones. An identical cached request returns its original ACK without reapplying. Reusing a cached ID with different fields returns 409. After eviction, an old request's stale expected revision still rejects it without reapplication; it may return 409 instead of the original ACK. Clients must generate unique IDs. A new explicit retry uses a new UUID and freshly read revision. Never automatically replay old commands after reconnecting.
 
