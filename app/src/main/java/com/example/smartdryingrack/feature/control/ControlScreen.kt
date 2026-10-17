@@ -93,7 +93,7 @@ private fun RejectReason.res(): Int = when (this) {
 fun ControlScreen(state: ControlUiState, actions: ControlActions, onHouseLights: () -> Unit = {}) {
     ScreenColumn {
         ModeSelector(state.mode, actions::setMode, Modifier.fillMaxWidth())
-        com.example.smartdryingrack.core.designsystem.NeonFeatureRow("House Lights", "Control six independent RGB zones", Icons.Outlined.Lightbulb, onHouseLights)
+        com.example.smartdryingrack.core.designsystem.NeonFeatureRow("House Lights", "Control six independent dimmable LEDs", Icons.Outlined.Lightbulb, onHouseLights)
 
         com.example.smartdryingrack.core.designsystem.RackHero(state.rackState)
         if (state.pendingMovement != null) {

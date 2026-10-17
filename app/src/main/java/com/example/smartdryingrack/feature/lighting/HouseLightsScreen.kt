@@ -3,9 +3,7 @@ package com.example.smartdryingrack.feature.lighting
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lightbulb
@@ -34,7 +32,6 @@ interface LightingActions {
     fun refresh()
     fun power(zone: LightingZone, enabled: Boolean)
     fun brightness(zone: LightingZone, percent: Int)
-    fun color(zone: LightingZone, rgb: Rgb)
     fun retry(zone: LightingZone)
     fun discard(zone: LightingZone)
 }
@@ -52,17 +49,11 @@ fun HouseLightsRoute(viewModel: HouseLightsViewModel = hiltViewModel()) {
     HouseLightsScreen(state, viewModel)
 }
 
-private data class ColorEditor(val zone: LightingZone, val rgb: Rgb, val boot: String?)
-
 @Composable
 fun HouseLightsScreen(state: HouseLightingState, actions: LightingActions) {
-    var editor by remember { mutableStateOf<ColorEditor?>(null) }
-    LaunchedEffect(state.connection, state.deviceSession) {
-        if (state.connection != LightingConnection.READY || editor?.boot != state.deviceSession) editor = null
-    }
     ScreenColumn {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Six independent RGB zones", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
+            Text("Six independent dimmable LEDs", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
                 color = AppColors.TextSecondary)
             TextButton(onClick = actions::refresh, enabled = state.connection !in setOf(LightingConnection.DISCONNECTED, LightingConnection.LOADING) &&
                 state.zones.values.none { it.busy }) { Text("Refresh lights") }
@@ -82,19 +73,11 @@ fun HouseLightsScreen(state: HouseLightingState, actions: LightingActions) {
         LightingZone.entries.forEach { id ->
             key(id) {
                 val zone = state.zones.getValue(id)
-                ZoneLightCard(id, zone, state.connection, actions) {
-                    zone.selected?.let { editor = ColorEditor(id, it.rgb, state.deviceSession) }
-                }
+                ZoneLightCard(id, zone, state.connection, actions)
             }
         }
-        Text("OFF retains the chosen color and brightness. ON at 0% brightness produces no visible light.",
+        Text("OFF retains the chosen brightness. ON at 0% brightness produces no visible light.",
             style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
-    }
-    editor?.let { edit ->
-        ColorPicker(edit.zone.label, edit.rgb, onDismiss = { editor = null }, onApply = {
-            if (state.connection == LightingConnection.READY && edit.boot == state.deviceSession) actions.color(edit.zone, it)
-            editor = null
-        })
     }
 }
 
@@ -105,7 +88,7 @@ private fun StatusLightCard(indicator: SystemStatusLight?, stale: Boolean) {
             NeonIcon(Icons.Outlined.Info)
             Column {
                 Text("System Status Light", fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
-                Text("Automatic · ESP32 controlled · read-only", style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
+                Text("Automatic RGB · ESP32 controlled · read-only", style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -124,7 +107,7 @@ private fun StatusLightCard(indicator: SystemStatusLight?, stale: Boolean) {
 
 @Composable
 private fun ZoneLightCard(id: LightingZone, zone: ZoneLightingState, connection: LightingConnection,
-                          actions: LightingActions, openColor: () -> Unit) {
+                          actions: LightingActions) {
     val selected = zone.selected
     val editable = connection == LightingConnection.READY && zone.confirmed != null && !zone.busy
     GlassCard(Modifier.fillMaxWidth()) {
@@ -153,18 +136,6 @@ private fun ZoneLightCard(id: LightingZone, zone: ZoneLightingState, connection:
         Spacer(Modifier.height(12.dp))
         Text(selected?.outputDescription ?: "Power and output not reported", color = AppColors.TextSecondary,
             style = MaterialTheme.typography.bodySmall)
-        OutlinedButton(onClick = openColor, enabled = editable, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
-            .semantics { contentDescription = "${id.label} color" }, shape = RoundedCornerShape(12.dp)) {
-            if (selected != null) {
-                ColorSwatch(selected.rgb, Modifier.size(28.dp), "Selected color")
-                Spacer(Modifier.width(12.dp))
-            }
-            Column(Modifier.weight(1f)) {
-                Text("${if (zone.pending != null) "Pending" else "Selected"} color: ${selected?.rgb?.hex ?: "not reported"}")
-                selected?.rgb?.let { Text("R ${it.r} · G ${it.g} · B ${it.b}", style = MaterialTheme.typography.labelSmall) }
-            }
-            Text("Edit", modifier = Modifier.padding(start = 8.dp))
-        }
         Text("Brightness: ${selected?.brightness?.let { "$it%" } ?: "—%"}", color = AppColors.TextPrimary,
             modifier = Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodyMedium)
         Slider(value = selected?.brightness?.toFloat() ?: 0f, onValueChange = { actions.brightness(id, it.roundToInt()) },
@@ -173,7 +144,7 @@ private fun ZoneLightCard(id: LightingZone, zone: ZoneLightingState, connection:
                 stateDescription = selected?.let { "${it.brightness} percent${if (zone.pending != null) ", pending" else ", confirmed"}" } ?: "Not reported"
             })
         zone.confirmed?.settings?.let {
-            Text("${if (connection == LightingConnection.READY) "Device-confirmed" else "Last confirmed (stale)"}: ${if (it.power) "ON" else "OFF"} · ${it.rgb.hex} · ${it.brightness}%",
+            Text("${if (connection == LightingConnection.READY) "Device-confirmed" else "Last confirmed (stale)"}: ${if (it.power) "ON" else "OFF"} · ${it.brightness}%",
                 style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
         }
         zone.pending?.let {
@@ -200,25 +171,4 @@ private fun ColorSwatch(rgb: Rgb, modifier: Modifier, label: String) {
         .border(1.dp, AppColors.Border, RoundedCornerShape(8.dp)).semantics {
             contentDescription = "$label ${rgb.hex}, red ${rgb.r}, green ${rgb.g}, blue ${rgb.b}"
         })
-}
-
-@Composable
-private fun ColorPicker(zone: String, initial: Rgb, onDismiss: () -> Unit, onApply: (Rgb) -> Unit) {
-    var color by remember(initial) { mutableStateOf(initial) }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("$zone color") },
-        text = {
-            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                ColorSwatch(color, Modifier.fillMaxWidth().height(64.dp), "Color preview")
-                Text(color.hex, color = AppColors.TextPrimary, fontWeight = FontWeight.Bold)
-                listOf("Red" to color.r, "Green" to color.g, "Blue" to color.b).forEach { (label, value) ->
-                    Text("$label: $value / 255")
-                    Slider(value = value.toFloat(), valueRange = 0f..255f, onValueChange = { next ->
-                        val channel = next.roundToInt()
-                        color = when (label) { "Red" -> color.copy(r = channel); "Green" -> color.copy(g = channel); else -> color.copy(b = channel) }
-                    }, modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = "$label level" })
-                }
-                Text("Preview only. Apply sends one debounced zone change.", style = MaterialTheme.typography.bodySmall)
-            }
-        }, confirmButton = { TextButton(onClick = { onApply(color) }) { Text("Apply color") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
 }

@@ -33,13 +33,11 @@ import java.io.File
 class HouseLightsRenderTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
     private class Actions : LightingActions {
-        val colors = mutableListOf<Pair<LightingZone, Rgb>>()
         val powers = mutableListOf<Pair<LightingZone, Boolean>>()
         val brightnesses = mutableListOf<Pair<LightingZone, Int>>()
         override fun refresh() {}
         override fun power(zone: LightingZone, enabled: Boolean) { powers += zone to enabled }
         override fun brightness(zone: LightingZone, percent: Int) { brightnesses += zone to percent }
-        override fun color(zone: LightingZone, rgb: Rgb) { colors += zone to rgb }
         override fun retry(zone: LightingZone) {}
         override fun discard(zone: LightingZone) {}
     }
@@ -64,11 +62,10 @@ class HouseLightsRenderTest {
         }
         compose.waitForIdle()
     }
-    private fun screenshot(name: String, dialog: Boolean = false) {
+    private fun screenshot(name: String) {
         compose.waitForIdle()
         val image = compose.runOnIdle {
-            val view = if (dialog) requireNotNull(org.robolectric.shadows.ShadowDialog.getLatestDialog()?.window).decorView
-                else compose.activity.window.decorView
+            val view = compose.activity.window.decorView
             Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888).also { view.draw(Canvas(it)) }
         }
         val file = File("build/outputs/ui-screenshots/$name.png")
@@ -77,7 +74,7 @@ class HouseLightsRenderTest {
     }
     @Test fun allZonesScrollOnSmallScreenAndStatusHasNoManualControls() {
         show(fixture(), Actions())
-        compose.onNodeWithText("Automatic · ESP32 controlled · read-only").assertExists()
+        compose.onNodeWithText("Automatic RGB · ESP32 controlled · read-only").assertExists()
         compose.onNodeWithText("Simulated normal operation").assertExists()
         // Exactly six manual switches and six brightness sliders; the seventh indicator adds neither.
         compose.onAllNodes(isToggleable()).assertCountEquals(6)
@@ -89,20 +86,14 @@ class HouseLightsRenderTest {
         }
         screenshot("18-house-lights-balcony-simulated")
     }
-    @Test fun pickerPreviewDoesNotSendUntilApplyAndTargetsOnlySelectedZone() {
-        val actions = Actions(); show(fixture(), actions)
-        compose.onNodeWithContentDescription("Front color").performScrollTo().performClick()
-        compose.onNodeWithContentDescription("Red level").performSemanticsAction(SemanticsActions.SetProgress) { it(255f) }
-        compose.onNodeWithText("#FFA0DC").assertExists()
-        assertTrue(actions.colors.isEmpty())
-        screenshot("19-color-picker-simulated", dialog = true)
-        compose.onNodeWithText("Apply color").performClick()
-        assertEquals(listOf(LightingZone.FRONT to Rgb(255, 160, 220)), actions.colors)
-        compose.onNodeWithContentDescription("Left side color").performScrollTo().performClick()
-        compose.onNodeWithContentDescription("Blue level").performSemanticsAction(SemanticsActions.SetProgress) { it(0f) }
-        compose.onNodeWithText("Cancel").performClick()
-        assertEquals(1, actions.colors.size)
-        assertTrue(actions.powers.isEmpty()); assertTrue(actions.brightnesses.isEmpty())
+    @Test fun ordinaryLightsHaveNoColorControlsAndStatusIsReadOnly() {
+        show(fixture(), Actions())
+        LightingZone.entries.forEach {
+            compose.onNodeWithContentDescription("${it.label} color").assertDoesNotExist()
+        }
+        compose.onNodeWithText("Apply color").assertDoesNotExist()
+        compose.onAllNodes(isToggleable()).assertCountEquals(6)
+        compose.onAllNodes(SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo)).assertCountEquals(6)
     }
     @Test fun powerAndBrightnessTargetTheirLabeledZone() {
         val actions = Actions(); show(fixture(), actions)
@@ -118,10 +109,9 @@ class HouseLightsRenderTest {
         compose.onNodeWithText("Device state and meaning not reported").assertExists()
         LightingZone.entries.forEach {
             compose.onNodeWithContentDescription("${it.label} power").assertIsNotEnabled()
-            compose.onNodeWithContentDescription("${it.label} color").assertIsNotEnabled()
             compose.onNodeWithContentDescription("${it.label} brightness").assertIsNotEnabled()
         }
-        compose.onAllNodesWithText("Selected color: not reported").assertCountEquals(6)
+        compose.onAllNodesWithText("Power and output not reported").assertCountEquals(6)
     }
     @Test fun zeroBrightnessAndPendingFeedbackRemainReadableAtLargeFont() {
         val state = fixture()

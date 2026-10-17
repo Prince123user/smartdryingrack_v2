@@ -45,31 +45,30 @@ class LightingRepositoryTest {
         assertTrue(repo.state.value.zones.values.all { it.pending == null })
     }
 
-    @Test fun rapidColorAndSliderChangesCoalesceWithoutChangingOtherZones() = runTest {
+    @Test fun rapidSliderChangesCoalesceWithoutChangingOtherZones() = runTest {
         val device = Device(); val repo = LightingRepository(device, backgroundScope)
         repo.open("rack"); runCurrent()
         val untouched = repo.state.value.zones.getValue(left)
         repo.brightness(front, 20); advanceTimeBy(150); repo.brightness(front, 25)
-        advanceTimeBy(150); repo.color(front, Rgb(255, 0, 100))
+        advanceTimeBy(150); repo.brightness(front, 30)
         advanceTimeBy(399); runCurrent(); assertTrue(device.writes.isEmpty())
         assertEquals(70, repo.state.value.zones.getValue(front).confirmed!!.settings.brightness)
         advanceTimeBy(1); runCurrent()
         assertEquals(1, device.writes.size)
-        assertEquals(LightSettings(true, Rgb(255, 0, 100), 25), device.writes.single().settings)
+        assertEquals(LightSettings(true, 30), device.writes.single().settings)
         assertEquals(untouched, repo.state.value.zones.getValue(left))
     }
 
-    @Test fun offAndOnRetainColorAndBrightnessAndZeroIsExplicit() = runTest {
+    @Test fun offAndOnRetainBrightnessAndZeroIsExplicit() = runTest {
         val device = Device(); val repo = LightingRepository(device, backgroundScope)
         repo.open("rack"); runCurrent()
         repo.power(front, false); runCurrent()
         val off = repo.state.value.zones.getValue(front).confirmed!!.settings
-        assertFalse(off.power); assertEquals(Rgb(32, 160, 220), off.rgb); assertEquals(70, off.brightness)
+        assertFalse(off.power); assertEquals(70, off.brightness)
         repo.brightness(front, 0); advanceTimeBy(401); runCurrent()
         repo.power(front, true); runCurrent()
         val on = repo.state.value.zones.getValue(front).confirmed!!.settings
         assertTrue(on.power); assertEquals(0, on.brightness); assertTrue(on.outputDescription.contains("no visible output"))
-        assertEquals(off.rgb, on.rgb)
     }
 
     @Test fun acceptedCommandStaysPendingUntilActualGetConfirmsRequestAndValues() = runTest {

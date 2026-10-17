@@ -16,8 +16,8 @@ class LightingApiTest {
     @Test fun parsesActualZonesAndReadOnlyIndicator() {
         val snapshot = parseLightingSnapshot(snapshotJson().toString())
         assertEquals(LightingZone.entries.toSet(), snapshot.zones.keys)
-        assertEquals("test_normal", snapshot.indicator.meaning)
-        assertEquals("Simulated normal operation", snapshot.indicator.description)
+        assertEquals("test_normal", snapshot.indicator!!.meaning)
+        assertEquals("Simulated normal operation", snapshot.indicator!!.description)
         assertEquals(70, snapshot.zones.getValue(LightingZone.CR).settings.brightness)
     }
     @Test fun rejectsMissingDuplicateUnknownOrStatusManualZones() {
@@ -28,7 +28,7 @@ class LightingApiTest {
             { it.getJSONArray("zones").getJSONObject(0).put("id", "system_status") },
             { it.getJSONObject("indicator").put("mode", "MANUAL") },
             { it.getJSONObject("indicator").put("pattern", "unknown") },
-            { it.put("schemaVersion", 2) },
+            { it.put("schemaVersion", 1) },
             { it.put("deviceSession", "") },
             { it.getJSONArray("zones").getJSONObject(0).put("revision", 1) }
         ).forEach { mutate ->
@@ -42,13 +42,20 @@ class LightingApiTest {
             val json = snapshotJson(); json.getJSONArray("zones").getJSONObject(0).put(field, value)
             assertThrows(Exception::class.java) { parseLightingSnapshot(json.toString()) }
         }
+        val houseRgb = snapshotJson()
+        houseRgb.getJSONArray("zones").getJSONObject(0).put("rgb", JSONObject().put("r", 255).put("g", 0).put("b", 0))
+        assertThrows(Exception::class.java) { parseLightingSnapshot(houseRgb.toString()) }
         listOf(-1, 256, 1.5, "20").forEach { value ->
-            val json = snapshotJson(); json.getJSONArray("zones").getJSONObject(0).getJSONObject("rgb").put("r", value)
+            val json = snapshotJson(); json.getJSONObject("indicator").getJSONObject("rgb").put("r", value)
             assertThrows(Exception::class.java) { parseLightingSnapshot(json.toString()) }
         }
     }
+    @Test fun unreportedIndicatorIsNotInvented() {
+        val json = snapshotJson().put("indicator", JSONObject.NULL)
+        assertNull(parseLightingSnapshot(json.toString()).indicator)
+    }
     private val update = LightingUpdate(LightingZone.BALCONY, "test-boot", 0, "test-request",
-        LightSettings(false, Rgb(255, 128, 0), 0))
+        LightSettings(false, 0))
     private val ack = """{"accepted":true,"requestId":"test-request","zone":"balcony","deviceSession":"test-boot","revision":1}"""
     private fun server(test: suspend (MockWebServer, LightingApi, String) -> Unit) = runBlocking {
         val server = MockWebServer(); server.start(InetAddress.getByName("127.0.0.1"), 0)
@@ -64,9 +71,9 @@ class LightingApiTest {
         val request = server.takeRequest()
         assertEquals("POST", request.method); assertEquals("/api/lights/zones/balcony", request.path)
         val body = JSONObject(request.body.readUtf8())
-        assertEquals(setOf("requestId", "deviceSession", "expectedRevision", "power", "rgb", "brightness"), body.keySet())
+        assertEquals(setOf("requestId", "deviceSession", "expectedRevision", "power", "brightness"), body.keySet())
         assertFalse(body.getBoolean("power")); assertEquals(0, body.getInt("brightness"))
-        assertEquals(128, body.getJSONObject("rgb").getInt("g"))
+        assertFalse(body.has("rgb"))
         assertEquals("no-cache", request.getHeader("Cache-Control"))
     }
     @Test fun wrongZoneSessionRequestRevisionOrAcceptanceCannotConfirmACommand() = server { server, api, address ->

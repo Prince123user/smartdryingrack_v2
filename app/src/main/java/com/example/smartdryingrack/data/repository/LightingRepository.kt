@@ -135,7 +135,6 @@ class LightingRepository(private val api: LightingGateway, private val scope: Co
         require(percent in 0..100)
         edit(id) { it.copy(brightness = percent) }
     }
-    fun color(id: LightingZone, rgb: Rgb) = edit(id) { it.copy(rgb = rgb) }
     fun discard(id: LightingZone) {
         if (_state.value.zones.getValue(id).busy) return
         commands.remove(id)?.cancel()

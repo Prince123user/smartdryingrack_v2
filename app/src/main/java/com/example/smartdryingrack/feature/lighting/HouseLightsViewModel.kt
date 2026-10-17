@@ -7,7 +7,6 @@ import com.example.smartdryingrack.data.hardware.rest.WifiRackController
 import com.example.smartdryingrack.data.hardware.rest.WifiTransport
 import com.example.smartdryingrack.data.repository.LightingRepository
 import com.example.smartdryingrack.domain.model.LightingZone
-import com.example.smartdryingrack.domain.model.Rgb
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -28,7 +27,6 @@ class HouseLightsViewModel @Inject constructor(private val rack: WifiRackControl
     override fun refresh() = repository.refresh()
     override fun power(zone: LightingZone, enabled: Boolean) = repository.power(zone, enabled)
     override fun brightness(zone: LightingZone, percent: Int) = repository.brightness(zone, percent)
-    override fun color(zone: LightingZone, rgb: Rgb) = repository.color(zone, rgb)
     override fun retry(zone: LightingZone) = repository.retry(zone)
     override fun discard(zone: LightingZone) = repository.discard(zone)
 }

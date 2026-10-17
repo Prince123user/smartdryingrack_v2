@@ -31,7 +31,7 @@ fun HomeScreen(state: HomeUiState, onConnect: () -> Unit = {}, onControl: () -> 
     val online = state.connection == ConnectionState.ONLINE
     ScreenColumn {
         DeviceConnectionCard(state.connection, onConnect)
-        NeonFeatureRow("House Lights", "Six RGB zones · automatic system status", Icons.Outlined.Lightbulb, onHouseLights)
+        NeonFeatureRow("House Lights", "Six dimmable LEDs · automatic RGB status", Icons.Outlined.Lightbulb, onHouseLights)
         RackHero(state.rackState, showPosition = false)
         RackStatusCard(state.rackState, state.rainConfirmed, null)
         androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp),

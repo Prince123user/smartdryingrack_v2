@@ -274,7 +274,7 @@ class NavigationRenderTest {
             listOf("Home", "Control").forEach { source ->
                 tab(source).performClick()
                 compose.onNode(hasText("House Lights") and hasClickAction()).performScrollTo().performClick()
-                compose.onNodeWithText("Six independent RGB zones").assertExists()
+                compose.onNodeWithText("Six independent dimmable LEDs").assertExists()
                 compose.onNodeWithContentDescription("Front power").assertIsNotEnabled()
                 compose.onNodeWithContentDescription("Back").performClick()
                 tab(source).assertIsSelected()
