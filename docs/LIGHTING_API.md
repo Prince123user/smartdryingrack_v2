@@ -134,3 +134,5 @@ The screen fetches on open/resume/reconnect, polls every 2 seconds and retries r
 Cloud checks cover the real app build, mocked API validation/HTTP payloads, zone isolation, OFF brightness retention, zero output, reconnect/stale responses, six manual switches/sliders and repeated navigation. C++ host checks simulate only the output driver. Neither check certifies physical LEDs, the final circuit, target ESP32 compilation or the missing working firmware's behavior.
 
 After integration, test distinct brightness values on all six LEDs, OFF/ON retention, zero, reboot-OFF, simultaneous edits, Wi-Fi loss/recovery and status-priority overlaps. Confirm the working firmware's stable-dry extension, latched STOP, rain retraction, manual control, diagnostics and buzzer patterns remain intact under lighting traffic.
+
+For TCP timeouts, address checks and distinguishing missing firmware from an unreachable rack, see [connection troubleshooting](CONNECTION_TROUBLESHOOTING.md).

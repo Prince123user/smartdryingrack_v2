@@ -37,7 +37,7 @@ interface LightingActions {
 }
 
 @Composable
-fun HouseLightsRoute(viewModel: HouseLightsViewModel = hiltViewModel()) {
+fun HouseLightsRoute(onConnectionSettings: () -> Unit = {}, viewModel: HouseLightsViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(viewModel, lifecycle) {
@@ -46,11 +46,11 @@ fun HouseLightsRoute(viewModel: HouseLightsViewModel = hiltViewModel()) {
             try { awaitCancellation() } finally { viewModel.deactivate() }
         }
     }
-    HouseLightsScreen(state, viewModel)
+    HouseLightsScreen(state, viewModel, onConnectionSettings)
 }
 
 @Composable
-fun HouseLightsScreen(state: HouseLightingState, actions: LightingActions) {
+fun HouseLightsScreen(state: HouseLightingState, actions: LightingActions, onConnectionSettings: () -> Unit = {}) {
     ScreenColumn {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Six independent dimmable LEDs", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
@@ -62,12 +62,24 @@ fun HouseLightsScreen(state: HouseLightingState, actions: LightingActions) {
             LightingConnection.DISCONNECTED -> "Connect your rack to load lighting state."
             LightingConnection.LOADING -> "Reading lighting state from the device…"
             LightingConnection.READY -> "Lighting connected · actual device readings available"
-            LightingConnection.ERROR -> "Lighting connection error · last readings may be stale"
+            LightingConnection.ERROR -> when (state.problem) {
+                LightingProblem.WIFI_UNAVAILABLE -> "Wi-Fi unavailable · waiting to reconnect"
+                LightingProblem.UNREACHABLE -> "Rack unreachable · retrying automatically"
+                else -> "Lighting service unavailable · retrying automatically"
+            }
             LightingConnection.UNSUPPORTED -> "Lighting-enabled firmware required"
         }, color = if (state.connection == LightingConnection.ERROR) AppColors.Warning else AppColors.Primary,
             style = MaterialTheme.typography.bodyMedium)
         if (state.connection == LightingConnection.LOADING) LinearProgressIndicator(Modifier.fillMaxWidth())
         state.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary) }
+        if (state.connection == LightingConnection.ERROR && state.lastSyncedAt != null) {
+            Text("Last confirmed readings may be stale.", style = MaterialTheme.typography.bodySmall, color = AppColors.Warning)
+        }
+        if (state.connection in setOf(LightingConnection.DISCONNECTED, LightingConnection.ERROR, LightingConnection.UNSUPPORTED)) {
+            OutlinedButton(onClick = onConnectionSettings, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                Text("Connection settings")
+            }
+        }
         StatusLightCard(state.indicator, stale = state.connection != LightingConnection.READY)
         Text("House zones", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
         LightingZone.entries.forEach { id ->

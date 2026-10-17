@@ -2,6 +2,8 @@ package com.example.smartdryingrack.data.repository
 
 import com.example.smartdryingrack.data.hardware.rest.LightingGateway
 import com.example.smartdryingrack.data.hardware.rest.RackHttpException
+import com.example.smartdryingrack.data.hardware.rest.RackWifiUnavailableException
+import java.io.IOException
 import com.example.smartdryingrack.domain.model.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,6 +14,7 @@ import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 
 enum class LightingConnection { DISCONNECTED, LOADING, READY, ERROR, UNSUPPORTED }
+enum class LightingProblem { WIFI_UNAVAILABLE, UNREACHABLE, HTTP_ERROR, INVALID_STATE }
 enum class LightCommandPhase { DEBOUNCING, SENDING, CONFIRMING, FAILED }
 data class PendingLightChange(val settings: LightSettings, val requestId: String, val baseRevision: Long,
                               val phase: LightCommandPhase, val requiredRevision: Long? = null)
@@ -27,7 +30,8 @@ data class HouseLightingState(
     val deviceSession: String? = null,
     val version: Long? = null,
     val error: String? = null,
-    val lastSyncedAt: Long? = null
+    val lastSyncedAt: Long? = null,
+    val problem: LightingProblem? = null
 )
 
 /** Owned by the screen ViewModel. Calls/state transitions are confined to its UI coroutine scope.
@@ -57,10 +61,10 @@ class LightingRepository(private val api: LightingGateway, private val scope: Co
         if (deviceAddress != null) address = deviceAddress
         failPending("Connection changed. The command outcome is unknown; refresh and review before retrying.")
         if (deviceAddress == null) {
-            _state.update { it.copy(connection = LightingConnection.DISCONNECTED, error = null) }
+            _state.update { it.copy(connection = LightingConnection.DISCONNECTED, error = null, problem = null) }
             return
         }
-        _state.update { it.copy(connection = LightingConnection.LOADING, error = null) }
+        _state.update { it.copy(connection = LightingConnection.LOADING, error = null, problem = null) }
         val epoch = generation
         polling = scope.launch {
             while (isActive && epoch == generation) {
@@ -121,7 +125,7 @@ class LightingRepository(private val api: LightingGateway, private val scope: Co
             }
             _state.update { state ->
                 state.copy(connection = LightingConnection.READY, indicator = snapshot.indicator,
-                    deviceSession = snapshot.deviceSession, version = snapshot.version, error = null, lastSyncedAt = now(),
+                    deviceSession = snapshot.deviceSession, version = snapshot.version, error = null, problem = null, lastSyncedAt = now(),
                     zones = state.zones.mapValues { (id, ui) ->
                         val actual = snapshot.zones.getValue(id)
                         val pending = ui.pending
@@ -136,9 +140,21 @@ class LightingRepository(private val api: LightingGateway, private val scope: Co
             if (epoch != generation) return
             val unsupported = e is RackHttpException && e.statusCode in setOf(404, 501)
             if (unsupported) failPending("Lighting-enabled firmware is required.")
+            val problem = when (e) {
+                is RackWifiUnavailableException -> LightingProblem.WIFI_UNAVAILABLE
+                is RackHttpException -> LightingProblem.HTTP_ERROR
+                is IOException -> LightingProblem.UNREACHABLE
+                else -> LightingProblem.INVALID_STATE
+            }
+            val message = when {
+                unsupported -> "The ESP32 replied, but its firmware has no lighting API. Install firmware supporting the ordinary-LED lighting API (schema 2). Refreshing alone cannot add firmware support."
+                problem == LightingProblem.WIFI_UNAVAILABLE -> "Connect your phone to the rack’s Wi-Fi network. Lighting state will retry automatically when Wi-Fi returns."
+                problem == LightingProblem.UNREACHABLE -> "The ESP32 did not respond at the configured address. Check its power and current IP in Connection settings, and keep your phone on the same Wi-Fi. Retrying automatically."
+                e is RackHttpException -> "The ESP32 replied with HTTP ${e.statusCode}, but lighting state is unavailable. Retrying automatically; check the firmware lighting service."
+                else -> "The ESP32 replied with incompatible or inconsistent lighting data. Check that its firmware supports the ordinary-LED lighting API (schema 2). No settings were confirmed."
+            }
             _state.update { it.copy(connection = if (unsupported) LightingConnection.UNSUPPORTED else LightingConnection.ERROR,
-                error = if (unsupported) "This firmware does not provide house-light control. Rack controls remain available."
-                    else "Could not read lighting state. ${e.message ?: "Check the Wi-Fi connection."}") }
+                problem = problem, error = message) }
         }
     }
 
@@ -204,7 +220,8 @@ class LightingRepository(private val api: LightingGateway, private val scope: Co
                 if (e is CancellationException) throw e
                 if (!current(epoch, id, pending.requestId)) return@launch
                 zone(id) { it.copy(pending = it.pending?.copy(phase = LightCommandPhase.FAILED),
-                    error = "Change not confirmed: ${e.message ?: "connection lost"}. No automatic resend.") }
+                    error = if (e is RackHttpException) "Change not confirmed (HTTP ${e.statusCode}). Review device state before retrying. No automatic resend."
+                        else "Change could not be confirmed. Check the connection and review actual device state before retrying. No automatic resend.") }
                 fetch(epoch, target)
             }
         }

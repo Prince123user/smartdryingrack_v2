@@ -72,4 +72,34 @@ class WifiTransportTest {
         job.cancel(); runCurrent()
         verify(manager).unregisterNetworkCallback(callback.value)
     }
+    @Test fun activeWifiWinsOverAnOldWifiNetworkListedFirst() {
+        val manager = mock(ConnectivityManager::class.java)
+        val oldWifi = mock(Network::class.java)
+        val activeWifi = mock(Network::class.java)
+        val capabilities = mock(NetworkCapabilities::class.java)
+        `when`(capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)).thenReturn(true)
+        `when`(manager.allNetworks).thenReturn(arrayOf(oldWifi, activeWifi))
+        `when`(manager.activeNetwork).thenReturn(activeWifi)
+        `when`(manager.getNetworkCapabilities(oldWifi)).thenReturn(capabilities)
+        `when`(manager.getNetworkCapabilities(activeWifi)).thenReturn(capabilities)
+        val url = URL("http://192.168.1.92/api/lights")
+        val connection = mock(HttpURLConnection::class.java)
+        `when`(activeWifi.openConnection(url)).thenReturn(connection)
+        assertSame(connection, transport(manager).openConnection(url))
+        verify(oldWifi, never()).openConnection(url)
+    }
+
+    @Test fun ipConfigurationChangesTriggerConnectionRecovery() = runTest {
+        val manager = mock(ConnectivityManager::class.java)
+        var changes = 0
+        val job = backgroundScope.launch { transport(manager).changes.collect { changes++ } }
+        runCurrent()
+        val callback = ArgumentCaptor.forClass(ConnectivityManager.NetworkCallback::class.java)
+        verify(manager).registerNetworkCallback(any(NetworkRequest::class.java), callback.capture())
+        callback.value.onLinkPropertiesChanged(mock(Network::class.java), LinkProperties())
+        runCurrent(); assertEquals(1, changes)
+        job.cancel(); runCurrent()
+        verify(manager).unregisterNetworkCallback(callback.value)
+    }
+
 }

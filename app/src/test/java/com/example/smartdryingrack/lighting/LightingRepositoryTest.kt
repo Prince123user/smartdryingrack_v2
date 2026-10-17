@@ -190,4 +190,32 @@ class LightingRepositoryTest {
         }
     }
 
+    @Test fun timeoutIsActionableWithoutClaimingFirmwareIsMissingAndRecoversAutomatically() = runTest {
+        val device = Device().also { it.readFailure = java.net.SocketTimeoutException("port 80 from port 36258 after 2500ms") }
+        val repo = LightingRepository(device, backgroundScope)
+        repo.open("rack"); runCurrent()
+        assertEquals(LightingConnection.ERROR, repo.state.value.connection)
+        assertEquals(LightingProblem.UNREACHABLE, repo.state.value.problem)
+        assertTrue(repo.state.value.error!!.contains("current IP"))
+        assertFalse(repo.state.value.error!!.contains("36258"))
+        assertNull(repo.state.value.lastSyncedAt)
+        assertTrue(repo.state.value.zones.values.all { it.confirmed == null })
+        repo.power(front, true); runCurrent(); assertTrue(device.writes.isEmpty())
+        device.readFailure = null; advanceTimeBy(5001); runCurrent()
+        assertEquals(LightingConnection.READY, repo.state.value.connection)
+        assertNull(repo.state.value.problem); assertNull(repo.state.value.error)
+        assertNotNull(repo.state.value.zones.getValue(front).confirmed)
+    }
+
+    @Test fun wifiAndMissingFirmwareAreDistinctFailures() = runTest {
+        val device = Device().also { it.readFailure = RackWifiUnavailableException() }
+        val repo = LightingRepository(device, backgroundScope)
+        repo.open("rack"); runCurrent()
+        assertEquals(LightingProblem.WIFI_UNAVAILABLE, repo.state.value.problem)
+        device.readFailure = RackHttpException(404)
+        advanceTimeBy(5001); runCurrent()
+        assertEquals(LightingConnection.UNSUPPORTED, repo.state.value.connection)
+        assertTrue(repo.state.value.error!!.contains("firmware has no lighting API"))
+    }
+
 }

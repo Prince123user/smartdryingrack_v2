@@ -126,4 +126,22 @@ class HouseLightsRenderTest {
         compose.onNodeWithContentDescription("Balcony power").performScrollTo().assertIsDisplayed().assertIsEnabled()
         screenshot("20-house-lights-large-text-simulated")
     }
+    @Test fun unreachableRackShowsConnectionActionWithoutClaimingNonexistentReadingsAreStale() {
+        var opened = false
+        compose.runOnUiThread {
+            compose.activity.setContent {
+                SmartDryingRackTheme {
+                    HouseLightsScreen(HouseLightingState(connection = LightingConnection.ERROR,
+                        error = "The ESP32 did not respond at the configured address.", problem = LightingProblem.UNREACHABLE),
+                        Actions(), onConnectionSettings = { opened = true })
+                }
+            }
+        }
+        compose.onNodeWithText("Rack unreachable · retrying automatically").assertExists()
+        compose.onNodeWithText("Last confirmed readings may be stale.").assertDoesNotExist()
+        compose.onNodeWithText("Connection settings").performClick()
+        assertTrue(opened)
+        compose.onNodeWithContentDescription("Front power").assertIsNotEnabled()
+    }
+
 }
