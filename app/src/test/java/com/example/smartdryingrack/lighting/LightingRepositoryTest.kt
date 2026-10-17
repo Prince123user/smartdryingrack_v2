@@ -218,4 +218,17 @@ class LightingRepositoryTest {
         assertTrue(repo.state.value.error!!.contains("firmware has no lighting API"))
     }
 
+    @Test fun unavailablePwmZoneDoesNotBlockOtherHouseLights() = runTest {
+        val device = Device()
+        val failed = device.snapshot.zones.getValue(front).copy(available = false)
+        device.snapshot = device.snapshot.copy(zones = device.snapshot.zones + (front to failed))
+        val repo = LightingRepository(device, backgroundScope)
+        repo.open("rack"); runCurrent()
+        repo.power(front, false); repo.brightness(front, 10); runCurrent()
+        assertTrue(device.writes.isEmpty())
+        repo.power(left, false); runCurrent()
+        assertEquals(listOf(left), device.writes.map { it.zone })
+        assertFalse(repo.state.value.zones.getValue(left).confirmed!!.settings.power)
+    }
+
 }

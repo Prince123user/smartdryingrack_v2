@@ -4,26 +4,29 @@ This replaces the earlier six-RGB-zone proposal. **Front, Left side, Right side,
 
 ## Implementation status
 
-- Android client/UI: implemented, with six independent power/brightness controls, per-zone pending/error feedback, actual-state fetching, and a separate read-only RGB status card.
-- `firmware/SmartDryingRack/HouseLighting.h`: hardware-independent C++ state/command component, host-tested with a simulated output driver. It is **not included by or enabled in the current sketch**.
-- ESP32 lighting HTTP endpoints and physical driver: **not integrated yet**. The supplied working `.ino` has not been attached in this conversation. The repository sketch lacks the described stable-dry extension and latched STOP behavior, so it is deliberately unchanged. Do not replace working firmware with it to obtain lighting.
-- Wiring: provisional plan in [LIGHTING_WIRING.md](LIGHTING_WIRING.md). Expansion-board identity, LED electrical ratings/resistors and RGB part/pinout are still required. No finished circuit, GPIO assignment, upload-ready updated working `.ino`, target compile or physical operation is claimed.
+Firmware **1.1.1** in `firmware/SmartDryingRack/SmartDryingRack.ino` is merged from the supplied **SmartDryingRack_complete.ino**. It preserves the uploaded rack automation, latched STOP, wiring and existing APIs, including legacy GET/POST `/api/lights`. Additive schema-2 fields and per-zone POST routes now match the Android client. The previous unused portable scaffold has been removed.
 
-The existing rack `/api/status`, `/api/commands` and `/api/buzzer` APIs, rain monitoring, servo, buzzer, history and notifications remain unchanged. Missing lighting routes (GET 404/501) disable lighting controls; other read failures retry without replaying commands. The app rejects the previous RGB house-zone schema 1 rather than issuing incompatible writes.
+The sketch uses the upload's six direct ESP32 LEDC outputs, not the superseded external-PWM plan. See [firmware/build guide](ESP32_FIRMWARE.md) and [source-aligned wiring](LIGHTING_WIRING.md). The app and firmware are built/tested in software; actual electrical operation and the board-specific circuit are not physically verified. Credentials are placeholders in the repository and must be configured locally.
+
+RGB hardware output remains disabled until its type/pinout are confirmed. GET returns `indicator:null` in that configuration; legacy `statusIndicator` reports desired logical colors with `hardwareEnabled:false` for diagnostics only. The app must not display those logical values as a physical light state.
+
+GET 404/501 disables lighting controls; a timeout is separately reported as an unreachable rack, never proof that firmware support is absent. The app rejects earlier RGB house-zone schema 1 instead of writing an incompatible request.
 
 ## State and values
 
 Stable case-sensitive IDs: `front`, `left`, `right`, `back`, `cr`, `balcony`. `system_status` is not a manual zone.
 
+Each zone also reports `available` (boolean): false means PWM initialization/write failed. Its retained settings then describe the last stored selection, not a verified current output. The app disables only that zone and labels it unavailable; other zones remain usable. The app accepts omitted availability as true for earlier schema-2 implementations.
+
 Each ordinary LED has `power` (strict JSON boolean) and `brightness` (strict JSON integer 0–100 percent). Zero means no visible output, even while power remains ON. OFF suppresses output but preserves the selected brightness. Changing brightness while OFF does not turn the LED on. RGB/color fields are invalid for house zones.
 
-The proposed firmware component starts **all six OFF with brightness 50% retained in RAM** on every boot, after its driver successfully applies OFF to all outputs. No house settings persist in NVS; reboot loses prior selections. Existing buzzer persistence is unrelated and must be preserved. Hardware must also default OFF during reset/brownout before firmware starts; see wiring requirements.
+The uploaded implementation starts **all six OFF with selected brightness 100% in RAM** on every boot. No house settings persist in NVS; reboot loses prior selections. The uploaded device config and buzzer setting are also RAM-only; the compatibility routes preserve this policy. Hardware must also default OFF during reset/brownout before firmware starts; see wiring requirements.
 
 `deviceSession` is a unique boot token; change it every reboot. Session/request tokens use 1–96 ASCII letters, digits, `.`, `_` or `-` (UUIDs are valid). `revision`, `expectedRevision`, `stateVersion` are nonnegative integers ≤9007199254740991. `stateVersion` increases for every applied house or status-indicator change; each zone's revision is its most recent applied global version, ≤stateVersion. Initial values may be zero. Only applied driver state is publishable, not merely queued targets; optical feedback is not implied.
 
 ## GET actual state
 
-`GET /api/lights` → 200 with exactly six distinct house zones. Example values below are illustrative, not live readings:
+`GET /api/lights` → 200 with exactly six distinct house zones. The schema-2 portion is shown below; the actual response additionally retains `firmwareVersion`, `settingsPersist`, legacy `lights` and logical `statusIndicator` fields. Example values below are illustrative, not live readings:
 
 ```json
 {
@@ -47,8 +50,8 @@ The proposed firmware component starts **all six OFF with brightness 50% retaine
 ```json
 {
   "id":"system_status","mode":"AUTOMATIC","power":true,
-  "rgb":{"r":255,"g":0,"b":0},"brightness":30,
-  "meaning":"rain","description":"Rain detected","pattern":"solid"
+  "rgb":{"r":255,"g":0,"b":0},"brightness":100,
+  "meaning":"RAIN_DETECTED","description":"RAIN_DETECTED","pattern":"solid"
 }
 ```
 
@@ -68,70 +71,47 @@ Indicator RGB channels are integers 0–255; brightness is 0–100; power is boo
 }
 ```
 
-Apply a complete absolute setting only to the addressed zone. Require exactly these fields; reject unknown/missing/duplicate keys, nested values, string/number booleans, fractional brightness, out-of-range values and any RGB/color field. JSON parsing and type validation belong in the HTTP adapter before constructing the C++ typed request. The companion component is not a JSON parser.
+Apply a complete absolute setting only to the addressed zone. Require exactly these fields; reject unknown/missing/duplicate keys, nested values, string/number booleans, fractional brightness, out-of-range values and any RGB/color field. The integrated handlers use ArduinoJson with strict type checks and reject duplicate top-level fields in these flat request schemas. The original legacy POST retains its uploaded contract.
 
 Reject wrong session/stale addressed-zone revision before output changes. Each zone's revision is independent: changing Front does not invalidate an unrelated Left command. Never treat invalid/omitted zone IDs as all zones. `POST .../system_status` must return 403; no manual indicator-write or bulk endpoint exists.
 
 ### Accepted
 
-The proposed component applies one short, bounded driver transaction synchronously. Only on success does it publish state and return `200 OK`:
+The integrated handler applies one bounded LEDC duty write synchronously. Only on success does it publish state and return `200 OK`:
 
 ```json
 {"accepted":true,"requestId":"new-uuid","zone":"front","deviceSession":"boot-unique-token","revision":2}
 ```
 
-The mobile client also supports a future `202 Accepted` implementation, but this component has no command queue. A queued adapter would need its own per-zone serialization and reservation logic. Do not return success before driver application with the synchronous component.
+The mobile client also supports a future `202 Accepted` implementation, but this firmware has no command queue. A queued adapter would need its own per-zone serialization and reservation logic. Do not return success before driver application with the synchronous handler.
 
 The app keeps confirmed state separate from the pending selection. ACK alone is insufficient: a fresh GET must show the same session, zone, request ID, exact power/brightness and revision ≥ the acknowledged revision. An old/mismatched ACK or an old snapshot cannot overwrite a newer selection. Even in a newer global snapshot, a zone revision must not regress, and its values/request identity cannot change without a new zone revision. Inconsistent responses leave the previous confirmed values intact, label them stale and report a connection error.
 
-The component caches the most recent 32 successful request identities across zones. An identical cached request returns its original ACK without reapplying. Reusing a cached ID with different fields returns 409. After eviction, an old request's stale expected revision still rejects it without reapplication; it may return 409 instead of the original ACK. Clients must generate unique IDs. A new explicit retry uses a new UUID and freshly read revision. Never automatically replay old commands after reconnecting.
+The firmware caches the most recent 32 successful request identities across zones. An identical cached request returns its original ACK without reapplying. Reusing a cached ID with different fields returns 409. After eviction, an old request's stale expected revision still rejects it without reapplication; it may return 409 instead of the original ACK. Clients must generate unique IDs. A new explicit retry uses a new UUID and freshly read revision. Never automatically replay old commands after reconnecting.
 
 ### Rejected or unavailable
 
-Example `409 Conflict`:
+Example `409 Conflict` (the existing uploaded error format is preserved):
 
 ```json
-{
-  "accepted":false,"requestId":"new-uuid","zone":"front","deviceSession":"boot-unique-token",
-  "error":{"code":"REVISION_CONFLICT","message":"Fetch current zone state before retrying."}
-}
+{"error":"REVISION_CONFLICT","message":"Zone changed; fetch actual state"}
 ```
 
-HTTP adapter mapping:
+Implemented statuses/codes: 400 `INVALID_LIGHT` / `INVALID_JSON` / `INVALID_REQUEST`, 403 `READ_ONLY_INDICATOR`, 404 `NOT_FOUND`, 409 `SESSION_CHANGED` / `REVISION_CONFLICT` / `REQUEST_ID_REUSE`, 503 `LIGHT_UNAVAILABLE`. Validation rejection changes no output. A duty-write failure marks that zone unavailable, advances its revision and clears request identity without publishing the intended setting as successful. GET still returns other zones and includes `available:false` on the failed zone. Hardware recovery/reinitialization needs actual device validation; no automatic command replay occurs.
 
-| Component result | HTTP | Error code |
-| --- | --- | --- |
-| INVALID_REQUEST / invalid JSON or types | 400 | `INVALID_REQUEST` |
-| READ_ONLY_INDICATOR | 403 | `READ_ONLY_INDICATOR` |
-| UNKNOWN_ZONE | 404 | `UNKNOWN_ZONE` |
-| SESSION_CHANGED | 409 | `SESSION_CHANGED` |
-| REVISION_CONFLICT | 409 | `REVISION_CONFLICT` |
-| REQUEST_ID_REUSE | 409 | `REQUEST_ID_REUSE` |
-| NOT_READY / VERSION_EXHAUSTED | 503 | `LIGHTING_UNAVAILABLE` |
-| DRIVER_FAILURE | 503 | `DRIVER_FAILURE` |
+Use `Content-Type: application/json`, `Cache-Control: no-store`, request bodies limited to 1024 bytes, bounded response bodies (client limit 65,536 characters), and no redirects. The app shows non-2xx errors by HTTP code; it also handles `accepted:false` in a legacy 2xx body without false success.
 
-Validation rejection causes no output changes. A failed bus write can have an uncertain physical outcome: the component marks itself unavailable and does not publish the intended setting as confirmed. GET must then return 503 rather than stale state as actual. Reinitialize/read back hardware under an explicit recovery policy before becoming ready. Other rack functions must continue.
+## Automatic status mapping from the uploaded source
 
-Use `Content-Type: application/json`, `Cache-Control: no-store`, bounded request bodies (e.g. 512 bytes), bounded response bodies (client limit 65,536 characters), and no redirects. The app shows non-2xx errors by HTTP code; it also handles `accepted:false` in a legacy 2xx body without false success.
+The firmware's logical priority is: servo fault → stale/invalid DHT → rain → STOP latch → Wi-Fi connecting → starting → rack moving → dry/extended → retracted idle. Respective colors are yellow, yellow, red, yellow, blue, blue, cyan, green and white. Rain protection remains independent of indication. This preserves the uploaded implementation rather than substituting the earlier proposed priority.
 
-## Automatic RGB mapping — proposal, not a physical implementation
-
-The isolated `proposeIndicator()` function expresses this candidate policy for integration after the RGB type is confirmed:
-
-| Priority | Condition | Proposed RGB | Meaning |
-| --- | --- | --- | --- |
-| 1 | Sensor/device/driver error | Yellow (255,255,0) | `error` |
-| 2 | Wi-Fi connecting/disconnected | Blue (0,0,255) | `connecting` |
-| 3 | Rain detected | Red (255,0,0) | `rain` |
-| 4 | Dry, normal operation | Green (0,255,0) | `normal` |
-
-Error overrides connection state, which overrides rain, which overrides normal. Rain safety continues even when blue/yellow takes visual priority. Firmware must define valid/fresh sensor conditions; do not announce green while sensors are invalid. Wi-Fi state is locally detected; absence of phone polling alone is not disconnection. Proposed colors may be solid; brightness and physical polarity remain unassigned until electrical details are available. The function returns a proposed logical color only, never a confirmed physical state. Only call `indicatorApplied()` after an actual driver update succeeds.
+With `STATUS_RGB_ENABLED=false`, this is **logical indication only**, not physical output. The optional digital GPIO RGB implementation is for a confirmed four-pin part and only supports channel ON/OFF colors at full channel level. It must not be enabled or wired until the actual RGB type, pinout, polarity and current limiting are confirmed. The app displays a read-only physical indicator only when the firmware reports the enabled output; house-light commands have no route to these RGB outputs.
 
 ## App reliability and verification
 
 The screen fetches on open/resume/reconnect, polls every 2 seconds and retries read failures every 5 seconds. Brightness edits debounce 400 ms; power sends immediately. Per-zone state separates confirmed and pending values. A zone awaiting acceptance/confirmation is disabled while other zones remain available. Lighting traffic has its own mutex, independent of motor and buzzer traffic. Pending selections are clearly unconfirmed on failure, with explicit Retry/Discard. Confirmation timeout is 8 seconds after the first post-ACK read. There is no demo fallback, saved-color state or offline mutation queue.
 
-Cloud checks cover the real app build, mocked API validation/HTTP payloads, zone isolation, OFF brightness retention, zero output, reconnect/stale responses, six manual switches/sliders and repeated navigation. C++ host checks simulate only the output driver. Neither check certifies physical LEDs, the final circuit, target ESP32 compilation or the missing working firmware's behavior.
+Cloud checks cover the real app build, mocked API validation/HTTP payloads, zone isolation, OFF brightness retention, zero output, reconnect/stale responses, six manual switches/sliders and repeated navigation. C++ host checks execute the merged sketch with simulated GPIO, Wi-Fi and HTTP, using the real ArduinoJson parser. Neither check certifies physical LEDs, the final circuit, target ESP32 compilation or the real rack's physical behavior.
 
 After integration, test distinct brightness values on all six LEDs, OFF/ON retention, zero, reboot-OFF, simultaneous edits, Wi-Fi loss/recovery and status-priority overlaps. Confirm the working firmware's stable-dry extension, latched STOP, rain retraction, manual control, diagnostics and buzzer patterns remain intact under lighting traffic.
 

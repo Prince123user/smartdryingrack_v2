@@ -52,7 +52,9 @@ fun parseLightingSnapshot(body: String): LightingSnapshot {
         require(revision <= version) { "Zone revision exceeds snapshot version." }
         require(zone.has("lastRequestId")) { "Missing lighting lastRequestId." }
         val request = if (zone.isNull("lastRequestId")) null else zone.token("lastRequestId")
-        zones[id] = ConfirmedZone(zone.settings(), revision, request)
+        val available = if (zone.has("available")) zone.get("available") else true
+        require(available is Boolean) { "Invalid zone availability." }
+        zones[id] = ConfirmedZone(zone.settings(), revision, request, available)
     }
     require(json.has("indicator")) { "Missing system-indicator state." }
     val indicator = if (json.isNull("indicator")) null else {

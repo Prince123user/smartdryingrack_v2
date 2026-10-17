@@ -9,6 +9,8 @@
 #include <iomanip>
 #include <string>
 #include <vector>
+#include <functional>
+#include <cstring>
 using std::min;
 using std::max;
 using std::isfinite;
@@ -21,6 +23,7 @@ public:
   String(const std::string& s):value(s){}
   String(int n):value(std::to_string(n)){}
   String(float f, int precision) { std::ostringstream s; s << std::fixed << std::setprecision(precision) << f; value=s.str(); }
+  const char* c_str() const { return value.c_str(); }
   char operator[](int n) const { return value[n]; }
   int length() const { return value.size(); }
   bool isEmpty() const { return value.empty(); }
@@ -41,6 +44,7 @@ inline int fakeADC=3300, fakeDigital=HIGH, tones=0, stops=0;
 inline unsigned long millis(){return fakeNow;}
 inline void delay(unsigned long n){fakeNow+=n;}
 inline void pinMode(int,int){}
+inline void digitalWrite(int,int){}
 inline void analogReadResolution(int){}
 inline void analogSetPinAttenuation(int,int){}
 inline int analogRead(int){return fakeADC;}
@@ -48,25 +52,29 @@ inline int digitalRead(int){return fakeDigital;}
 inline int constrain(int n,int low,int high){return min(high,max(low,n));}
 inline void tone(int,int,int){tones++;}
 inline void noTone(int){stops++;}
-struct SerialClass {void begin(int){} void println(const char*){}};
+struct SerialClass {
+ void begin(int){} template<class T> void print(const T&){} template<class T> void println(const T&){}
+ void print(float,int){} void println(){}
+};
 inline SerialClass Serial;
-struct WiFiClass {int status(){return WL_CONNECTED;} void mode(int){} void setAutoReconnect(bool){} void persistent(bool){} void begin(const char*,const char*){} void disconnect(bool,bool){}};
+struct WiFiClass {int status(){return WL_CONNECTED;} void mode(int){} void setAutoReconnect(bool){} void persistent(bool){} void begin(const char*,const char*){} void setHostname(const char*){} String localIP(){return "192.168.1.92";} void disconnect(bool,bool){}};
 inline WiFiClass WiFi;
 class WebServer {
 public:
   String body,response; int code=0; bool hasBody=true;
-  std::map<std::string,void(*)()> routes;
+  std::map<std::string,std::function<void()>> routes;
   explicit WebServer(int){}
   void sendHeader(const char*,const char*){}
   void send(int c,const char*,const String&r){code=c;response=r;}
   bool hasArg(const char*){return hasBody;}
   String arg(const char*){return body;}
-  void on(const char* p,int method,void(*f)()){routes[std::string(p)+std::to_string(method)]=f;}
+  void on(const char* p,int method,std::function<void()> f){routes[std::string(p)+std::to_string(method)]=f;}
   void onNotFound(void(*)()){}
   void begin(){} void handleClient(){}
 };
 class DHT {public:DHT(int,int){} void begin(){} float readHumidity(){return 64;} float readTemperature(){return 29.5;}};
-class Servo {public:int writes=0,angle=0;void setPeriodHertz(int){} void attach(int,int,int){} void write(int a){angle=a;writes++;}};
+class ESP32PWM {public:static void allocateTimer(int){}};
+class Servo {public:bool attached(){return true;}int writes=0,angle=0;void setPeriodHertz(int){} void attach(int,int,int){} void write(int a){angle=a;writes++;}};
 class Preferences {
 public:
   std::map<std::string,bool> values;
@@ -74,3 +82,12 @@ public:
   bool getBool(const char* k,bool fallback){return values.count(k)?values[k]:fallback;}
   size_t putBool(const char* k,bool v){values[k]=v;return 1;}
 };
+
+inline std::map<int, int> pwmChannels, pwmDuty;
+inline int failedPwmPin = -1;
+inline bool ledcAttachChannel(int pin,int frequency,int bits,int channel) {
+  (void)frequency;(void)bits; pwmChannels[pin]=channel;return pin!=failedPwmPin;
+}
+inline bool ledcWrite(int pin,int duty){if(pin==failedPwmPin)return false;pwmDuty[pin]=duty;return true;}
+inline double ledcWriteTone(int pin,int hz){pwmDuty[pin]=hz;if(hz)tones++;else stops++;return hz;}
+inline uint32_t esp_random(){static uint32_t v=100;return ++v;}

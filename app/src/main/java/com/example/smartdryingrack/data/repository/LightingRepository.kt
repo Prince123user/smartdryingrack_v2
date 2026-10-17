@@ -129,7 +129,7 @@ class LightingRepository(private val api: LightingGateway, private val scope: Co
                     zones = state.zones.mapValues { (id, ui) ->
                         val actual = snapshot.zones.getValue(id)
                         val pending = ui.pending
-                        val confirmedRequest = !rebooted && pending != null && actual.lastRequestId == pending.requestId &&
+                        val confirmedRequest = actual.available && !rebooted && pending != null && actual.lastRequestId == pending.requestId &&
                             actual.revision >= (pending.requiredRevision ?: (pending.baseRevision + 1)) && actual.settings == pending.settings
                         ui.copy(confirmed = actual, pending = if (confirmedRequest) null else pending,
                             error = if (confirmedRequest) null else ui.error)
@@ -176,7 +176,7 @@ class LightingRepository(private val api: LightingGateway, private val scope: Co
     private fun edit(id: LightingZone, debounce: Boolean = true, change: (LightSettings) -> LightSettings) {
         val state = _state.value
         val ui = state.zones.getValue(id)
-        if (state.connection != LightingConnection.READY || ui.busy) return
+        if (state.connection != LightingConnection.READY || ui.busy || ui.confirmed?.available == false) return
         val actual = ui.confirmed ?: return
         val desired = change(ui.selected ?: actual.settings)
         commands.remove(id)?.cancel() // Only unsent edits or a previously completed request can be replaced.

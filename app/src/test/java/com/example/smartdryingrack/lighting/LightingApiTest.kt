@@ -54,6 +54,20 @@ class LightingApiTest {
         val json = snapshotJson().put("indicator", JSONObject.NULL)
         assertNull(parseLightingSnapshot(json.toString()).indicator)
     }
+    @Test fun deviceReportsZoneAvailabilityWithoutInventingSuccess() {
+        val json = snapshotJson()
+        json.getJSONArray("zones").getJSONObject(0).put("available", false)
+        assertFalse(parseLightingSnapshot(json.toString()).zones.getValue(LightingZone.FRONT).available)
+        json.getJSONArray("zones").getJSONObject(0).put("available", "false")
+        assertThrows(Exception::class.java) { parseLightingSnapshot(json.toString()) }
+    }
+    @Test fun parsesSnapshotGeneratedByTheMergedFirmwareHostTest() {
+        val body = javaClass.getResource("/firmware-lights-v1.1.1.json")!!.readText()
+        val snapshot = parseLightingSnapshot(body)
+        assertEquals(6, snapshot.zones.size)
+        assertTrue(snapshot.zones.values.all { it.available && !it.settings.power && it.settings.brightness == 100 })
+        assertNull(snapshot.indicator) // Logical colors with disabled hardware are not actual RGB state.
+    }
     private val update = LightingUpdate(LightingZone.BALCONY, "test-boot", 0, "test-request",
         LightSettings(false, 0))
     private val ack = """{"accepted":true,"requestId":"test-request","zone":"balcony","deviceSession":"test-boot","revision":1}"""

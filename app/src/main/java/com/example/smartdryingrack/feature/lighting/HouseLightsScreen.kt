@@ -121,14 +121,14 @@ private fun StatusLightCard(indicator: SystemStatusLight?, stale: Boolean) {
 private fun ZoneLightCard(id: LightingZone, zone: ZoneLightingState, connection: LightingConnection,
                           actions: LightingActions) {
     val selected = zone.selected
-    val editable = connection == LightingConnection.READY && zone.confirmed != null && !zone.busy
+    val editable = connection == LightingConnection.READY && zone.confirmed?.available == true && !zone.busy
     GlassCard(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             NeonIcon(Icons.Outlined.Lightbulb)
             Column(Modifier.weight(1f)) {
                 Text(id.label, style = MaterialTheme.typography.titleMedium, color = AppColors.TextPrimary, fontWeight = FontWeight.Bold)
                 Text(when (connection) {
-                    LightingConnection.READY -> "Device connected"
+                    LightingConnection.READY -> if (zone.confirmed?.available == false) "PWM output unavailable" else "Device connected"
                     LightingConnection.LOADING -> "Checking connection"
                     LightingConnection.UNSUPPORTED -> "Firmware support unavailable"
                     LightingConnection.DISCONNECTED -> "Disconnected"
@@ -146,7 +146,7 @@ private fun ZoneLightCard(id: LightingZone, zone: ZoneLightingState, connection:
                 })
         }
         Spacer(Modifier.height(12.dp))
-        Text(selected?.outputDescription ?: "Power and output not reported", color = AppColors.TextSecondary,
+        Text(if (zone.confirmed?.available == false) "Output unavailable · check device driver" else selected?.outputDescription ?: "Power and output not reported", color = AppColors.TextSecondary,
             style = MaterialTheme.typography.bodySmall)
         Text("Brightness: ${selected?.brightness?.let { "$it%" } ?: "—%"}", color = AppColors.TextPrimary,
             modifier = Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodyMedium)
@@ -155,7 +155,7 @@ private fun ZoneLightCard(id: LightingZone, zone: ZoneLightingState, connection:
                 contentDescription = "${id.label} brightness"
                 stateDescription = selected?.let { "${it.brightness} percent${if (zone.pending != null) ", pending" else ", confirmed"}" } ?: "Not reported"
             })
-        zone.confirmed?.settings?.let {
+        zone.confirmed?.takeIf { it.available }?.settings?.let {
             Text("${if (connection == LightingConnection.READY) "Device-confirmed" else "Last confirmed (stale)"}: ${if (it.power) "ON" else "OFF"} · ${it.brightness}%",
                 style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
         }

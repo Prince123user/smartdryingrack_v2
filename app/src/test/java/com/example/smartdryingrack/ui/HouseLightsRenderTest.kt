@@ -144,4 +144,15 @@ class HouseLightsRenderTest {
         compose.onNodeWithContentDescription("Front power").assertIsNotEnabled()
     }
 
+    @Test fun failedPwmOutputIsDisabledWhileOtherZonesStayAvailable() {
+        val state = fixture()
+        val front = state.zones.getValue(LightingZone.FRONT)
+        show(state.copy(zones = state.zones + (LightingZone.FRONT to front.copy(
+            confirmed = front.confirmed!!.copy(available = false)))), Actions())
+        compose.onNodeWithContentDescription("Front power").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Front brightness").assertIsNotEnabled()
+        compose.onNodeWithText("PWM output unavailable").assertExists()
+        compose.onNodeWithContentDescription("Left side power").assertIsEnabled()
+    }
+
 }

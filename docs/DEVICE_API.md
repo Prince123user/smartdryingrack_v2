@@ -74,6 +74,8 @@ App automation runs only while the process is alive and connected. It is not a b
 
 `GET /api/status` may include a top-level boolean `buzzerEnabled`, `motionReason`, and `sensors.rainRaw`. Absence of `buzzerEnabled` means this firmware does not expose app buzzer support.
 
-`POST /api/buzzer` accepts `{"enabled":true,"requestId":"<unique ID>"}` and returns `{"accepted":true,"buzzerEnabled":true}`. The returned boolean must match the requested value. The firmware persists it and beeps briefly on enable. Setting changes do not move the rack, and acknowledgements from an obsolete connection session are not accepted.
+`POST /api/buzzer` accepts `{"enabled":true,"requestId":"<unique ID>"}` and returns `{"accepted":true,"buzzerEnabled":true}`. The returned boolean must match the requested value. The merged uploaded firmware keeps it in RAM until reboot and beeps briefly on enable; `/api/config` and `/api/buzzer/test` are retained. Setting changes do not move the rack, and acknowledgements from an obsolete connection session are not accepted.
 
 Rain-triggered app retraction requires current, fresh wet telemetry and confirmation; a stale debounce confirmation is insufficient when the latest reading is dry. Explicit schedules may still retract on dry days when enabled. New schedules default to disabled.
+
+The current firmware is based on the uploaded working sketch. See [firmware 1.1.1](ESP32_FIRMWARE.md) and [the implemented lighting API](LIGHTING_API.md) for its additive routes, volatile settings, stable-dry AUTO behavior and GPIO allocation.
