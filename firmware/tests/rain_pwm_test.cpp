@@ -40,19 +40,27 @@ int main() {
   operatingMode = MODE_AUTO; sample(3000); assert(dryTimerRunning);
   for (int i = 0; i < 40; ++i) sample(3000);
   assert(moving && rackState == EXTENDING);
+  // Fixed electrical expectations: OFF and ON-at-zero have the same output.
+  for (int zone = 0; zone < 6; ++zone) {
+    assert(houseLightOutputDuty(zone, false, 73) == (HOUSE_LIGHT_ACTIVE_LOW ? 255 : 0));
+    assert(houseLightOutputDuty(zone, true, 0) == (HOUSE_LIGHT_ACTIVE_LOW ? 255 : 0));
+    assert(houseLightOutputDuty(zone, true, 10) == (HOUSE_LIGHT_ACTIVE_LOW ? 229 : 26));
+    assert(houseLightOutputDuty(zone, true, 100) == (HOUSE_LIGHT_ACTIVE_LOW ? 0 : 255));
+  }
   // Exhaustive 0..100% on each zone: monotonic PWM, full OFF, unchanged neighbors.
   for (int zone = 0; zone < 6; ++zone) {
     int previous = -1;
     for (int percent = 0; percent <= 100; ++percent) {
       assert(applyHouseLight(zone, true, percent));
-      int duty = ledcRead(HOUSE_LIGHT_PINS[zone]);
+      int rawDuty = ledcRead(HOUSE_LIGHT_PINS[zone]);
+      int duty = HOUSE_LIGHT_ACTIVE_LOW_BY_ZONE[zone] ? 255 - rawDuty : rawDuty;
       assert(duty > previous); previous = duty;
       handleGetLights(); JsonDocument body; assert(!deserializeJson(body, server.response));
-      assert(body["lights"][zone]["pwmDutyReadback"].as<int>() == duty);
+      assert(body["lights"][zone]["pwmDutyReadback"].as<int>() == rawDuty);
       assert(body["lights"][zone]["pwmFrequencyHz"].as<int>() == 1000);
     }
     assert(previous == 255);
-    assert(applyHouseLight(zone, false, 37) && ledcRead(HOUSE_LIGHT_PINS[zone]) == 0);
+    assert(applyHouseLight(zone, false, 37) && ledcRead(HOUSE_LIGHT_PINS[zone]) == (HOUSE_LIGHT_ACTIVE_LOW_BY_ZONE[zone] ? 255 : 0));
     assert(houseLights[zone].brightness == 37);
   }
   std::cout << "PASS rain impulse rejection, sustained wet protection in MANUAL, STOP, dry AUTO and all six PWM ranges (simulated hardware)\n";

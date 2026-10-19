@@ -1,5 +1,5 @@
-/* Release 1.1.3: adds a nonblocking five-sample rain median filter and
- * PWM duty/frequency readback for diagnosing brightness with the compatible app.
+/* Release 1.1.4: adds configurable active-low house outputs for the reported
+ * reversed switches; retains rain filtering and PWM diagnostic readback.
  * Retains schema 2, per-zone guarded writes, boot sessions, revisions,
  * buzzerEnabled, nested rainRaw, latched STOP and stable-dry AUTO behavior.
  * Configure Wi-Fi locally. RGB remains disabled until hardware is identified.
@@ -14,7 +14,7 @@
  * LIGHTING ADDITION 1.1.0 - Read before wiring
  * This is the complete uploaded working 1.0.2 sketch plus lighting additions.
  * Six ordinary single-color LEDs: front D23, left D22, right D21, back D17,
- * CR D16, balcony D25. Each pin drives an active-high low-side driver input.
+ * CR D16, balcony D25. Input polarity is configurable; release 1.1.4 defaults to active-low.
  * Never connect an unresisted LED or a 5 V LED load directly to GPIO.
  * Use individually sized current limiting and a suitably rated driver/supply.
  * All driver/supply grounds join ESP32 GND. Servo keeps its external supply.
@@ -159,13 +159,23 @@ constexpr unsigned long DHT_MAX_AGE_MS = 6000;
 // Classic ESP32 WROOM-32 only: buzzer uses LEDC channel 14 (low-speed timer 3).
 // ESP32Servo is restricted to timer 0 below to keep its 50 Hz PWM separate.
 constexpr uint8_t BUZZER_LEDC_CHANNEL = 14;
-constexpr char FIRMWARE_VERSION[] = "1.1.3";
+constexpr char FIRMWARE_VERSION[] = "1.1.4";
 
-// Six SINGLE-COLOR house LEDs, driven through suitable active-high drivers.
+// Six SINGLE-COLOR house LEDs, with configured output/driver polarity.
 // GPIO -> driver input, NOT an unrestricted 5 V LED load. Use LED current limiting.
 // Channels 2..7 use high-speed timers 1..3 on classic ESP32; servo uses timer 0.
 // Buzzer channel 14 is in the other speed group, separate from house timers.
 constexpr uint8_t HOUSE_LIGHT_PINS[6] = {23, 22, 21, 17, 16, 25};
+// This user's reported reversed switches suggest active-low wiring/driver inputs.
+// Override to 0 for active-high GPIO -> resistor -> LED -> GND circuits.
+// This controls logic only: never connect an ESP32 GPIO to a 5 V LED supply.
+#ifndef HOUSE_LIGHT_ACTIVE_LOW
+#define HOUSE_LIGHT_ACTIVE_LOW 1
+#endif
+constexpr bool HOUSE_LIGHT_ACTIVE_LOW_BY_ZONE[6] = {
+  HOUSE_LIGHT_ACTIVE_LOW, HOUSE_LIGHT_ACTIVE_LOW, HOUSE_LIGHT_ACTIVE_LOW,
+  HOUSE_LIGHT_ACTIVE_LOW, HOUSE_LIGHT_ACTIVE_LOW, HOUSE_LIGHT_ACTIVE_LOW
+};
 constexpr uint8_t HOUSE_LIGHT_CHANNELS[6] = {2, 3, 4, 5, 6, 7};
 constexpr uint32_t HOUSE_LIGHT_PWM_HZ = 1000;
 constexpr uint8_t HOUSE_LIGHT_PWM_BITS = 8;
@@ -799,6 +809,11 @@ uint8_t brightnessToDuty(uint8_t percent) {
   return (uint8_t)(((uint16_t)percent * 255U + 50U) / 100U);
 }
 
+uint8_t houseLightOutputDuty(uint8_t index, bool power, uint8_t brightness) {
+  const uint8_t visibleDuty = power ? brightnessToDuty(brightness) : 0;
+  return HOUSE_LIGHT_ACTIVE_LOW_BY_ZONE[index] ? 255 - visibleDuty : visibleDuty;
+}
+
 int findHouseLight(const String& id) {
   for (uint8_t i = 0; i < 6; ++i) if (id == HOUSE_LIGHT_IDS[i]) return i;
   return -1;  // Includes "status": this indicator is never manually controllable.
@@ -806,7 +821,7 @@ int findHouseLight(const String& id) {
 
 bool applyHouseLight(uint8_t index, bool power, uint8_t brightness) {
   if (index >= 6 || brightness > 100 || !houseLights[index].available) return false;
-  uint8_t duty = power ? brightnessToDuty(brightness) : 0;
+  uint8_t duty = houseLightOutputDuty(index, power, brightness);
   if (lightingVersion == MAX_LIGHT_VERSION) return false;
   if (!ledcWrite(HOUSE_LIGHT_PINS[index], duty)) {
     houseLights[index].available = false;
@@ -823,14 +838,14 @@ bool applyHouseLight(uint8_t index, bool power, uint8_t brightness) {
 
 void initLighting() {
   for (uint8_t i = 0; i < 6; ++i) {
+    digitalWrite(HOUSE_LIGHT_PINS[i], HOUSE_LIGHT_ACTIVE_LOW_BY_ZONE[i] ? HIGH : LOW);
     pinMode(HOUSE_LIGHT_PINS[i], OUTPUT);
-    digitalWrite(HOUSE_LIGHT_PINS[i], LOW);
     houseLights[i].power = false;
     houseLights[i].brightness = 100;
     houseLights[i].available = ledcAttachChannel(HOUSE_LIGHT_PINS[i],
         HOUSE_LIGHT_PWM_HZ, HOUSE_LIGHT_PWM_BITS, HOUSE_LIGHT_CHANNELS[i]);
     if (houseLights[i].available) {
-      if (!ledcWrite(HOUSE_LIGHT_PINS[i], 0)) houseLights[i].available = false;
+      if (!ledcWrite(HOUSE_LIGHT_PINS[i], houseLightOutputDuty(i, false, 100))) houseLights[i].available = false;
     }
     if (!houseLights[i].available) {
       Serial.print("House-light PWM initialization failed: ");
@@ -933,9 +948,10 @@ void handleGetLights() {
     light["available"] = houseLights[i].available;
     light["type"] = "SINGLE_COLOR";
     light["gpio"] = HOUSE_LIGHT_PINS[i];
+    light["activeLow"] = HOUSE_LIGHT_ACTIVE_LOW_BY_ZONE[i];
     light["pwmDutyReadback"] = ledcRead(HOUSE_LIGHT_PINS[i]);
     light["pwmFrequencyHz"] = ledcReadFreq(HOUSE_LIGHT_PINS[i]);
-    light["outputDuty"] = houseLights[i].power ? brightnessToDuty(houseLights[i].brightness) : 0;
+    light["outputDuty"] = houseLightOutputDuty(i, houseLights[i].power, houseLights[i].brightness);
   }
   JsonObject indicator = doc["statusIndicator"].to<JsonObject>();
   indicator["automatic"] = true;
@@ -1166,7 +1182,7 @@ void setup() {
   server.on("/api/buzzer", HTTP_OPTIONS, handleOptions);
   server.onNotFound(handleNotFound);
   server.begin();
-  Serial.println("SMART RACK 1.1.3 - APP COMPATIBLE LIGHTS AND STATUS FIXES");
+  Serial.println("SMART RACK 1.1.4 - APP COMPATIBLE LIGHTS AND STATUS FIXES");
   Serial.println("Smart Drying Rack API started; waiting for Wi-Fi");
   if (!STATUS_RGB_ENABLED) Serial.println("RGB status physical output disabled: confirm LED type before enabling");
 }

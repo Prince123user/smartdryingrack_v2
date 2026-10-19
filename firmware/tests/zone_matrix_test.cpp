@@ -23,7 +23,7 @@ int main() {
       server.routes.at(std::string("/api/lights/zones/") + HOUSE_LIGHT_IDS[zone] + "1")();
       assert(server.code == 200);
       assert(houseLights[zone].power == power && houseLights[zone].brightness == brightness);
-      assert(pwmDuty[HOUSE_LIGHT_PINS[zone]] == (power ? brightnessToDuty(brightness) : 0));
+      assert(pwmDuty[HOUSE_LIGHT_PINS[zone]] == houseLightOutputDuty(zone, power, brightness));
       assert(fakeNow == started); // Handler contains no delay/timed waiting.
       for (unsigned j = 0; j < 6; ++j) if (j != zone) {
         assert(houseLights[j].power == before[j].power && houseLights[j].brightness == before[j].brightness);

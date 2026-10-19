@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
   assert(server.routes.count("/api/lights0") && server.routes.count("/api/lights1"));
   assert(server.routes.count("/api/lights/zones/front1") && server.routes.count("/api/buzzer1"));
   assert(stopLatched==false && operatingMode==MODE_AUTO);
-  for(int i=0;i<6;i++){assert(!houseLights[i].power && houseLights[i].brightness==100);assert(pwmDuty[HOUSE_LIGHT_PINS[i]]==0);}
+  for(int i=0;i<6;i++){assert(!houseLights[i].power && houseLights[i].brightness==100);assert(pwmDuty[HOUSE_LIGHT_PINS[i]]==houseLightOutputDuty(i,false,100));}
   handleGetLights();auto initial=responseJson();
   if(argc>1){std::ofstream output(argv[1]);output<<server.response.value;assert(output.good());}
   assert(initial["schemaVersion"]==2 && initial["zones"].size()==6 && initial["lights"].size()==6);
@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
   for(int i=0;i<6;i++){
     requestLight(i,("zone-"+std::to_string(i)).c_str(),true,10+i,0);
     assert(server.code==200 && houseLights[i].brightness==10+i);
-    assert(pwmDuty[HOUSE_LIGHT_PINS[i]]==brightnessToDuty(10+i));
+    assert(pwmDuty[HOUSE_LIGHT_PINS[i]]==houseLightOutputDuty(i,true,10+i));
   }
   const auto leftRev=houseLights[1].revision;
   requestLight(0,"front-off",false,10,houseLights[0].revision);
@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
   handleAppLight(0);assert(server.code==200 && houseLights[0].revision==rev);
   server.body=duplicate;handleAppLight(1);assert(server.code==409 && houseLights[1].revision==leftRev);
   requestLight(0,"front-on",true,10,rev);assert(server.code==200 && houseLights[0].brightness==10);
-  requestLight(0,"zero",true,0,houseLights[0].revision);assert(server.code==200 && pwmDuty[23]==0);
+  requestLight(0,"zero",true,0,houseLights[0].revision);assert(server.code==200 && pwmDuty[23]==houseLightOutputDuty(0,true,0));
   requestLight(0,"bad",true,101,houseLights[0].revision);assert(server.code==400);
   requestLight(0,"stale",true,50,0);assert(server.code==409);
   requestLight(0,"invalid-types",true,20,houseLights[0].revision);
