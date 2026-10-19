@@ -62,7 +62,7 @@ class LightingApiTest {
         assertThrows(Exception::class.java) { parseLightingSnapshot(json.toString()) }
     }
     @Test fun parsesSnapshotGeneratedByTheMergedFirmwareHostTest() {
-        val body = javaClass.getResource("/firmware-lights-v1.1.1.json")!!.readText()
+        val body = javaClass.getResource("/firmware-lights-v1.1.2.json")!!.readText()
         val snapshot = parseLightingSnapshot(body)
         assertEquals(6, snapshot.zones.size)
         assertTrue(snapshot.zones.values.all { it.available && !it.settings.power && it.settings.brightness == 100 })

@@ -4,7 +4,7 @@ This replaces the earlier six-RGB-zone proposal. **Front, Left side, Right side,
 
 ## Implementation status
 
-Firmware **1.1.1** in `firmware/SmartDryingRack/SmartDryingRack.ino` is merged from the supplied **SmartDryingRack_complete.ino**. It preserves the uploaded rack automation, latched STOP, wiring and existing APIs, including legacy GET/POST `/api/lights`. Additive schema-2 fields and per-zone POST routes now match the Android client. The previous unused portable scaffold has been removed.
+Firmware **1.1.2** in `firmware/SmartDryingRack/SmartDryingRack.ino` is merged from the supplied **SmartDryingRack_complete.ino**. It preserves the uploaded rack automation, latched STOP, wiring and existing APIs, including legacy GET/POST `/api/lights`. Additive schema-2 fields and per-zone POST routes now match the Android client. The previous unused portable scaffold has been removed.
 
 The sketch uses the upload's six direct ESP32 LEDC outputs, not the superseded external-PWM plan. See [firmware/build guide](ESP32_FIRMWARE.md) and [source-aligned wiring](LIGHTING_WIRING.md). The app and firmware are built/tested in software; actual electrical operation and the board-specific circuit are not physically verified. Credentials are placeholders in the repository and must be configured locally.
 

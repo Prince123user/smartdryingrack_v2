@@ -1,3 +1,9 @@
+/* Release 1.1.2: combines the latest uploaded status-label / sensor-error
+ * improvements with the checked Android-compatible lighting and buzzer APIs.
+ * Retains schema 2, per-zone guarded writes, boot sessions, revisions,
+ * buzzerEnabled, nested rainRaw, latched STOP and stable-dry AUTO behavior.
+ * Configure Wi-Fi locally. RGB remains disabled until hardware is identified.
+ */
 /* Integration revision 1.1.1: based on the supplied SmartDryingRack_complete.ino.
  * Preserves uploaded rack automation, STOP latch, wiring, PWM allocation and legacy APIs.
  * Adds schema-2 lighting metadata/per-zone routes and Android buzzer compatibility.
@@ -153,7 +159,7 @@ constexpr unsigned long DHT_MAX_AGE_MS = 6000;
 // Classic ESP32 WROOM-32 only: buzzer uses LEDC channel 14 (low-speed timer 3).
 // ESP32Servo is restricted to timer 0 below to keep its 50 Hz PWM separate.
 constexpr uint8_t BUZZER_LEDC_CHANNEL = 14;
-constexpr char FIRMWARE_VERSION[] = "1.1.1";
+constexpr char FIRMWARE_VERSION[] = "1.1.2";
 
 // Six SINGLE-COLOR house LEDs, driven through suitable active-high drivers.
 // GPIO -> driver input, NOT an unrestricted 5 V LED load. Use LED current limiting.
@@ -562,7 +568,31 @@ void handleStatus() {
   // A failed DHT sample is deliberately unavailable rather than silently
   // presenting cached readings as current. Rain protection continues locally.
   if (!dhtReady()) {
-    sendError(503, "SENSOR_FAILURE", "DHT22 reading unavailable");
+    // Keep HTTP 503 and original error fields for API compatibility. Include
+    // independent device information so the app can distinguish a sensor
+    // failure from a lost network connection. Never invent sensor readings.
+    JsonDocument doc;
+    doc["error"] = "SENSOR_FAILURE";
+    doc["message"] = "DHT22 reading unavailable";
+    doc["state"] = stateName(rackState);
+    doc["firmwareVersion"] = FIRMWARE_VERSION;
+    doc["deviceResponding"] = true;
+    doc["dhtValid"] = false;
+    doc["mode"] = modeName();
+    doc["stopLatched"] = stopLatched;
+    doc["positionSource"] = "COMMAND_ESTIMATE";
+    doc["positionMeasured"] = false;
+    doc["rainProtectionEnabled"] = RAIN_PROTECTION_ENABLED;
+    doc["rainRaw"] = lastRainRaw;
+    JsonObject sensors = doc["sensors"].to<JsonObject>();
+    sensors["temperature"] = nullptr;
+    sensors["humidity"] = nullptr;
+    sensors["rainDetected"] = rainConfirmed;
+    sensors["clothesDryPercentage"] = nullptr;
+    doc["diagnosticsPath"] = "/api/diagnostics";
+    String failureBody;
+    serializeJson(doc, failureBody);
+    sendJson(503, failureBody);
     return;
   }
   String body = "{\"state\":\"" + stateName(rackState) + "\",\"firmwareVersion\":\"" + FIRMWARE_VERSION + "\",\"sensors\":{";
@@ -803,14 +833,20 @@ void updateStatusIndicator() {
     reason = "STOPPED"; red = 255; green = 255;
   } else if (WiFi.status() != WL_CONNECTED) {
     reason = "WIFI_CONNECTING"; blue = 255;
-  } else if (!dhtReady() || clearReadings < RAIN_CLEAR_READINGS) {
-    reason = "STARTING"; blue = 255;
-  } else if (moving) {
+  } else if (rainWet) {
+    // Moisture has been sampled, but rain debounce has not yet confirmed it.
+    // Do not mislabel an extended rack as retracted during this transition.
+    reason = "RAIN_PENDING"; red = 255; green = 255;
+  } else if (moving || rackState == EXTENDING || rackState == RETRACTING) {
     reason = "RACK_MOVING"; green = 255; blue = 255;
-  } else if (rackState == EXTENDED && !rainWet) {
+  } else if (rackState == EXTENDED) {
     reason = "DRY_EXTENDED"; green = 255;
-  } else {
+  } else if (rackState == RETRACTED) {
     reason = "RETRACTED_IDLE"; red = green = blue = 255;
+  } else if (rackState == STOPPED) {
+    reason = "STOPPED"; red = 255; green = 255;
+  } else {
+    reason = "UNKNOWN_POSITION"; red = 255; green = 255;
   }
   bool changed = red != statusRed || green != statusGreen || blue != statusBlue || strcmp(reason, statusIndicatorReason) != 0;
   if (changed && lightingVersion < MAX_LIGHT_VERSION) ++lightingVersion;
@@ -1098,7 +1134,7 @@ void setup() {
   server.on("/api/buzzer", HTTP_OPTIONS, handleOptions);
   server.onNotFound(handleNotFound);
   server.begin();
-  Serial.println("SMART RACK 1.1.1 - SIX HOUSE LIGHTS + AUTOMATIC RGB STATUS LOGIC");
+  Serial.println("SMART RACK 1.1.2 - APP COMPATIBLE LIGHTS AND STATUS FIXES");
   Serial.println("Smart Drying Rack API started; waiting for Wi-Fi");
   if (!STATUS_RGB_ENABLED) Serial.println("RGB status physical output disabled: confirm LED type before enabling");
 }

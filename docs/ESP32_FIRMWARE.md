@@ -1,4 +1,4 @@
-# ESP32 firmware 1.1.1 — merged from the uploaded working sketch
+# ESP32 firmware 1.1.2 — merged from the uploaded working sketch
 
 `firmware/SmartDryingRack/SmartDryingRack.ino` is the complete updated sketch, based on the supplied **SmartDryingRack_complete.ino** (lighting version 1.1.0 / rack revision 1.0.2). The original uploaded file is unchanged. Repository Wi-Fi literals are placeholders; enter your own credentials locally before uploading and never commit them.
 
@@ -102,3 +102,9 @@ g++ -std=c++17 -Ifirmware/tests/stubs \
 Test real hardware with the original rack baseline first, then add one properly driven/current-limited LED at a time. Verify all six zones independently, distinct brightness values, zero, OFF/ON retention, reboot-OFF, loss/recovery of Wi-Fi, PWM availability failures, and status-priority overlaps. Recheck dry extension, rain retraction, latched STOP, manual commands, sensor diagnostics and buzzer patterns during lighting traffic. Confirm RGB type/pinout before enabling its optional code.
 
 An explicit STOP can still be attempted at the actively requested rack address when telemetry is in error (for example DHT HTTP 503). It must receive an actual command acknowledgement; failure remains unconfirmed. An explicit Disconnect disables these attempts. Emergency STOP is best-effort software control, not proof of physical motion cessation.
+
+## Release 1.1.2
+
+Combines the latest uploaded status improvements with the app-compatible APIs. Moisture awaiting debounce reports RAIN_PENDING; moving, extended, retracted, stopped and unknown positions get accurate logical labels. A meaning change advances lighting stateVersion even if its color stays the same. DHT failure remains HTTP 503, with null temperature/humidity and extra rack/rain diagnostics. The current app treats that as a sensor/status failure and does not consume the additional error-body fields; it never parses null readings as valid telemetry. The schema-2 lighting response, guarded zone routes, buzzer toggle, healthy status fields and rack functions are retained.
+
+Build target: ESP32 WROOM-32 / DIO, core 3.0.7 and pinned libraries listed above. Version 1.1.2 was compiled for that target and host-simulated, including every house-light route and the new status transitions. Physical operation remains unverified.

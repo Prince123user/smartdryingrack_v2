@@ -72,5 +72,20 @@ int main(int argc, char** argv) {
   stopLatched=false;rackState=EXTENDED;updateAutomation();assert(moving && rackState==RETRACTING);
   handleStatus();assert(server.code==200);auto status=responseJson();
   assert(status["buzzerEnabled"].as<bool>() && status["sensors"]["rainRaw"].is<int>());
+  // New upload's status-label fixes retain schema-2 revision tracking.
+  moving=false;stopLatched=false;rainConfirmed=false;rainWet=true;rackState=EXTENDED;
+  dhtValid=true;lastDhtSuccessAt=fakeNow;
+  updateStatusIndicator();assert(std::string(statusIndicatorReason)=="RAIN_PENDING");
+  rainWet=false;updateStatusIndicator();assert(std::string(statusIndicatorReason)=="DRY_EXTENDED");
+  rackState=RETRACTED;updateStatusIndicator();assert(std::string(statusIndicatorReason)=="RETRACTED_IDLE");
+  rackState=STOPPED;updateStatusIndicator();assert(std::string(statusIndicatorReason)=="STOPPED");
+  auto stoppedVersion=lightingVersion;
+  rackState=UNKNOWN;updateStatusIndicator();assert(std::string(statusIndicatorReason)=="UNKNOWN_POSITION");
+  assert(lightingVersion>stoppedVersion); // Same yellow color, different meaning still advances version.
+  rackState=EXTENDING;updateStatusIndicator();assert(std::string(statusIndicatorReason)=="RACK_MOVING");
+  dhtValid=false;handleStatus();assert(server.code==503);
+  auto sensorFailure=responseJson();
+  assert(sensorFailure["deviceResponding"].as<bool>() && sensorFailure["sensors"]["temperature"].isNull());
+  assert(sensorFailure["sensors"]["humidity"].isNull() && sensorFailure["error"].as<std::string>()=="SENSOR_FAILURE");
   std::cout<<"Merged firmware checks passed: legacy/schema-2 APIs, independent PWM, retained brightness, zero, deduplication, stale rejection, driver failures, buzzer, stable-dry AUTO and latched STOP.\n";
 }
