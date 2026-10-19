@@ -59,6 +59,11 @@ int main(int argc, char** argv) {
   moving=false;bootRetraction=false;rackState=RETRACTED;
   fakeNow=5000;dhtValid=true;lastDhtSuccessAt=fakeNow;temperatureC=29.5;humidityPercent=64;
   rainWet=rainConfirmed=false;clearReadings=RAIN_CLEAR_READINGS;
+  server.body="{\"mode\":\"MANUAL\"}";server.routes.at("/api/config1")();
+  assert(server.code==200 && operatingMode==MODE_MANUAL);
+  updateAutomation();assert(!moving && !dryTimerRunning);
+  server.body="{\"mode\":\"AUTO\"}";server.routes.at("/api/config1")();
+  assert(server.code==200 && operatingMode==MODE_AUTO);
   updateAutomation();assert(dryTimerRunning && !moving);
   fakeNow+=AUTO_EXTEND_DRY_DELAY_MS;lastDhtSuccessAt=fakeNow;
   updateAutomation();assert(moving && rackState==EXTENDING);

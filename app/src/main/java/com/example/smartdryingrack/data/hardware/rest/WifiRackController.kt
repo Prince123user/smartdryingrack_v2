@@ -1,6 +1,8 @@
 package com.example.smartdryingrack.data.hardware.rest
 
 import com.example.smartdryingrack.data.hardware.RackController
+import com.example.smartdryingrack.data.hardware.DeviceRackSettings
+import com.example.smartdryingrack.domain.model.RackMode
 import com.example.smartdryingrack.data.repository.DevicePreferences
 import com.example.smartdryingrack.domain.model.ConnectionState
 import com.example.smartdryingrack.domain.model.RackState
@@ -22,7 +24,7 @@ class WifiRackController internal constructor(
     private val preferences: DevicePreferences,
     private val api: RackApi,
     private val scope: CoroutineScope
-) : RackController {
+) : RackController, DeviceRackSettings {
     @Inject constructor(preferences: DevicePreferences, transport: WifiTransport) : this(
         preferences, RackApi(transport::openConnection), CoroutineScope(SupervisorJob() + Dispatchers.IO)
     ) {
@@ -35,6 +37,12 @@ class WifiRackController internal constructor(
     val message = _message.asStateFlow()
     private val _firmware = MutableStateFlow<String?>(null)
     val firmware = _firmware.asStateFlow()
+    private val _deviceMode = MutableStateFlow<RackMode?>(null)
+    override val deviceMode = _deviceMode.asStateFlow()
+    private val _modeSupported = MutableStateFlow(false)
+    override val modeSupported = _modeSupported.asStateFlow()
+    private val _stopLatched = MutableStateFlow<Boolean?>(null)
+    override val stopLatched = _stopLatched.asStateFlow()
     private val settingsRequest = Mutex()
     private val _buzzerEnabled = MutableStateFlow<Boolean?>(null)
     val buzzerEnabled = _buzzerEnabled.asStateFlow()
@@ -44,6 +52,7 @@ class WifiRackController internal constructor(
     val motionReason = _motionReason.asStateFlow()
     private val _requestedSession = MutableStateFlow<RackConnectionSession?>(null)
     val requestedSession = _requestedSession.asStateFlow()
+    override val canAttemptStop: Boolean get() = requestedSession.value != null
     private var polling: Job? = null
     @Volatile private var generation = 0L
     @Volatile private var activeAddress = ""
@@ -88,6 +97,9 @@ class WifiRackController internal constructor(
                         state.value = snapshot.state
                         sensors.value = snapshot.sensors
                         _firmware.value = snapshot.firmware
+                        _modeSupported.value = snapshot.mode != null
+                        _deviceMode.value = snapshot.mode
+                        _stopLatched.value = snapshot.stopLatched
                         _buzzerEnabled.value = snapshot.buzzerEnabled
                         _rainRaw.value = snapshot.rainRaw
                         _motionReason.value = snapshot.motionReason
@@ -119,9 +131,25 @@ class WifiRackController internal constructor(
         sensors.value = null
         _firmware.value = null
         _message.value = null
+        _deviceMode.value = null
+        _stopLatched.value = null
         _buzzerEnabled.value = null
         _rainRaw.value = null
         _motionReason.value = null
+    }
+
+    override suspend fun setDeviceMode(mode: RackMode) = withContext(Dispatchers.IO) {
+        check(connection.value == ConnectionState.ONLINE && deviceMode.value != null) { "Connect the rack before changing its device mode." }
+        val session = generation
+        val address = activeAddress
+        settingsRequest.withLock {
+            check(session == generation && connection.value == ConnectionState.ONLINE && deviceMode.value != null) {
+                "Connection changed before device mode could be sent."
+            }
+            val confirmed = api.setMode(address, mode)
+            if (session != generation) throw IOException("Connection changed; device mode was not confirmed.")
+            _deviceMode.value = confirmed
+        }
     }
 
     suspend fun setBuzzer(enabled: Boolean) = withContext(Dispatchers.IO) {
@@ -130,6 +158,9 @@ class WifiRackController internal constructor(
         val session = generation
         val address = activeAddress
         settingsRequest.withLock {
+            check(session == generation && connection.value == ConnectionState.ONLINE) {
+                "Connection changed before the buzzer setting could be sent."
+            }
             val confirmed = api.setBuzzer(address, enabled)
             if (session != generation) throw IOException("Connection changed; buzzer setting could not be confirmed.")
             _buzzerEnabled.value = confirmed
@@ -137,7 +168,7 @@ class WifiRackController internal constructor(
     }
 
     private suspend fun send(action: String) = withContext(Dispatchers.IO) {
-        check(connection.value == ConnectionState.ONLINE) { "Rack is offline." }
+        check(connection.value == ConnectionState.ONLINE || action == "STOP" && canAttemptStop) { "Rack is offline." }
         val session = generation
         val address = activeAddress
         try {

@@ -1,6 +1,7 @@
 package com.example.smartdryingrack.data.hardware.rest
 
 import com.example.smartdryingrack.domain.model.RackState
+import com.example.smartdryingrack.domain.model.RackMode
 import com.example.smartdryingrack.domain.model.SensorData
 import org.json.JSONObject
 import java.io.IOException
@@ -28,7 +29,7 @@ fun normalizeRackUrl(value: String): String {
 }
 
 data class RackSnapshot(val state: RackState, val sensors: SensorData, val firmware: String?,
-                        val buzzerEnabled: Boolean? = null, val rainRaw: Int? = null, val motionReason: String? = null)
+                        val buzzerEnabled: Boolean? = null, val rainRaw: Int? = null, val motionReason: String? = null, val mode: RackMode? = null, val stopLatched: Boolean? = null)
 
 fun parseRackSnapshot(body: String, receivedAt: Long): RackSnapshot {
     val json = JSONObject(body)
@@ -50,8 +51,13 @@ fun parseRackSnapshot(body: String, receivedAt: Long): RackSnapshot {
     require(buzzer == null || buzzer is Boolean) { "Invalid buzzer setting." }
     val raw = sensors.opt("rainRaw").takeUnless { it == JSONObject.NULL }
     require(raw == null || raw is Number && raw.toDouble() in 0.0..4095.0 && raw.toDouble() % 1.0 == 0.0) { "Invalid rain sensor reading." }
+    val mode = json.opt("mode").takeUnless { it == JSONObject.NULL }
+    require(mode == null || mode is String && mode in setOf("AUTO", "MANUAL")) { "Invalid device mode." }
+    val stop = json.opt("stopLatched").takeUnless { it == JSONObject.NULL }
+    require(stop == null || stop is Boolean) { "Invalid STOP latch." }
     return RackSnapshot(state, data, json.optString("firmwareVersion").takeIf { it.isNotBlank() },
-        buzzer as Boolean?, (raw as Number?)?.toInt(), json.optString("motionReason").takeIf { it.isNotBlank() })
+        buzzer as Boolean?, (raw as Number?)?.toInt(), json.optString("motionReason").takeIf { it.isNotBlank() },
+        (mode as String?)?.let(RackMode::valueOf), stop as Boolean?)
 }
 
 class RackHttpException(val statusCode: Int) : IOException("Rack returned HTTP $statusCode.")
@@ -75,6 +81,13 @@ class RackApi(private val connectionFactory: (URL) -> HttpURLConnection = { it.o
             throw IOException("The rack did not confirm the requested buzzer setting. Update the ESP32 firmware.")
         }
         return response.getBoolean("buzzerEnabled")
+    }
+
+    fun setMode(baseUrl: String, mode: RackMode): RackMode {
+        val body = JSONObject().put("mode", mode.name).toString()
+        val actual = JSONObject(request(baseUrl, "/api/config", body))
+        if (actual.opt("mode") != mode.name) throw IOException("The ESP32 did not confirm the requested mode.")
+        return mode
     }
 
     internal fun request(baseUrl: String, path: String, body: String? = null): String {

@@ -106,4 +106,24 @@ class RackApiTest {
         assertThrows(java.io.IOException::class.java) { api().status(url) }
         assertEquals(1, server.requestCount)
     }
+    @Test fun readsActualFirmwareModeAndStopLatchWithoutCoercion() {
+        val actual = org.json.JSONObject(status).put("mode", "AUTO").put("stopLatched", true)
+        val snapshot = parseRackSnapshot(actual.toString(), 123L)
+        assertEquals(com.example.smartdryingrack.domain.model.RackMode.AUTO, snapshot.mode)
+        assertEquals(true, snapshot.stopLatched)
+        actual.put("stopLatched", "true")
+        assertThrows(IllegalArgumentException::class.java) { parseRackSnapshot(actual.toString(), 123L) }
+    }
+
+    @Test fun deviceModeUsesConfigEndpointAndRequiresExactConfirmedValue() = withServer { server, url ->
+        server.enqueue(MockResponse().setBody("{\"mode\":\"MANUAL\"}"))
+        assertEquals(com.example.smartdryingrack.domain.model.RackMode.MANUAL,
+            api().setMode(url, com.example.smartdryingrack.domain.model.RackMode.MANUAL))
+        val request = server.takeRequest()
+        assertEquals("/api/config", request.path)
+        assertEquals(setOf("mode"), JSONObject(request.body.readUtf8()).keySet())
+        server.enqueue(MockResponse().setBody("{\"mode\":\"AUTO\"}"))
+        assertThrows(java.io.IOException::class.java) { api().setMode(url, com.example.smartdryingrack.domain.model.RackMode.MANUAL) }
+    }
+
 }

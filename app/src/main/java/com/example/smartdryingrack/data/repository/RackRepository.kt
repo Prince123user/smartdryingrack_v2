@@ -1,6 +1,9 @@
 package com.example.smartdryingrack.data.repository
 
 import com.example.smartdryingrack.data.hardware.RackController
+import com.example.smartdryingrack.data.hardware.DeviceRackSettings
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.collect
 import com.example.smartdryingrack.domain.model.CommandResult
 import com.example.smartdryingrack.domain.model.CommandSource
 import com.example.smartdryingrack.domain.model.ConnectionState
@@ -53,6 +56,16 @@ class RackRepository @Inject constructor(
 
     private val _mode = MutableStateFlow(RackMode.MANUAL)
     val mode: StateFlow<RackMode> = _mode.asStateFlow()
+    private val deviceSettings = controller as? DeviceRackSettings
+    private val modeUpdating = MutableStateFlow(false)
+    private val _modeMessage = MutableStateFlow<String?>(null)
+    val modeMessage = _modeMessage.asStateFlow()
+    init {
+        deviceSettings?.let { settings -> scope.launch {
+            settings.deviceMode.filterNotNull().collect { _mode.value = it }
+        } }
+    }
+
 
     private val _lastCommand = MutableStateFlow<LastCommand?>(null)
     val lastCommand: StateFlow<LastCommand?> = _lastCommand.asStateFlow()
@@ -80,7 +93,22 @@ class RackRepository @Inject constructor(
     }
 
     fun setMode(mode: RackMode) {
-        _mode.value = mode
+        val settings = deviceSettings
+        if (settings == null || !settings.modeSupported.value) {
+            _mode.value = mode // Legacy controllers only support phone automation.
+            return
+        }
+        if (!modeUpdating.compareAndSet(false, true)) return
+        _modeMessage.value = "Updating ESP32 mode…"
+        scope.launch {
+            try {
+                settings.setDeviceMode(mode)
+                _modeMessage.value = null // Mode itself changes only through confirmed device state.
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                _modeMessage.value = "ESP32 mode was not confirmed. Check the connection and try again."
+            } finally { modeUpdating.value = false }
+        }
     }
 
     fun setRainConfirmed(value: Boolean) { _rainConfirmed.value = value }
@@ -93,7 +121,9 @@ class RackRepository @Inject constructor(
             return CommandResult.Rejected(RejectReason.NOT_A_COMMAND)
         }
         if (action == RackAction.STOP && source == CommandSource.EMERGENCY) emergencyHold = true
-        if (connection.value != ConnectionState.ONLINE) return CommandResult.Rejected(RejectReason.OFFLINE)
+        if (connection.value != ConnectionState.ONLINE && !(action == RackAction.STOP && deviceSettings?.canAttemptStop == true)) {
+            return CommandResult.Rejected(RejectReason.OFFLINE)
+        }
 
         if (action == RackAction.STOP) {
             try {
@@ -114,6 +144,15 @@ class RackRepository @Inject constructor(
             return CommandResult.Accepted
         }
 
+        if (modeUpdating.value) return CommandResult.Rejected(RejectReason.BUSY)
+        if (source != CommandSource.MANUAL && deviceSettings?.stopLatched?.value == true) {
+            return CommandResult.Rejected(RejectReason.EMERGENCY_HOLD)
+        }
+        // Firmware owns rain protection when it exposes runtime mode/config settings.
+        // Avoid a phone rain command stopping/restarting its own automatic movement.
+        if (source == CommandSource.RAIN && deviceSettings?.modeSupported?.value == true) {
+            return CommandResult.Rejected(RejectReason.ALREADY_THERE)
+        }
         val sensor = sensorData.value
         if (action == RackAction.RETRACT && source == CommandSource.RAIN &&
             (sensor == null || !sensor.isValid || System.currentTimeMillis() - sensor.timestamp !in 0..6000 ||
@@ -125,7 +164,7 @@ class RackRepository @Inject constructor(
             return CommandResult.Rejected(RejectReason.ERROR)
         }
         if (rackState.value in setOf(RackState.UNKNOWN, RackState.ERROR)) return CommandResult.Rejected(RejectReason.ERROR)
-        if (source == CommandSource.MANUAL && mode.value != RackMode.MANUAL) return CommandResult.Rejected(RejectReason.BUSY)
+        if (source == CommandSource.MANUAL && (deviceSettings?.deviceMode?.value ?: mode.value) != RackMode.MANUAL) return CommandResult.Rejected(RejectReason.BUSY)
         if (pendingTarget != null && source.ordinal > CommandSource.RAIN.ordinal) return CommandResult.Rejected(RejectReason.BUSY)
 
         if (emergencyHold && source != CommandSource.MANUAL) {

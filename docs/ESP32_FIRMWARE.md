@@ -59,7 +59,7 @@ Open Serial Monitor at **115200 baud**. Wait for `Device URL: http://...`, then 
 
 ## Behavioral details preserved from the upload
 
-AUTO extends after 10 seconds of continuous readiness: valid/fresh DHT, dry rain readings/debounce, retracted and idle. A wet sample cancels the dry timer. MANUAL prevents automatic extension; enabled rain protection can still retract unless STOP is latched. STOP holds in either mode until a fresh accepted movement command resumes it. Device mode and protection settings remain available through GET/POST `/api/config`; the app's existing Auto/Manual selection is local phone automation and does not yet synchronize the device `/api/config` mode. Inspect the actual device config when diagnosing automatic movement.
+AUTO extends after 10 seconds of continuous readiness: valid/fresh DHT, dry rain readings/debounce, retracted and idle. A wet sample cancels the dry timer. MANUAL prevents automatic extension; enabled rain protection can still retract unless STOP is latched. STOP holds in either mode until a fresh accepted movement command resumes it. Device mode and protection settings remain available through GET/POST `/api/config`; the updated app reads the actual device mode from telemetry and sends Auto/Manual changes through `/api/config`. It keeps the displayed mode unchanged until confirmation, shows pending/error feedback, and blocks movement during a mode change. Legacy firmware without mode telemetry retains local phone-mode behavior. Phone rain commands do not interrupt firmware-owned rain protection, and scheduled/automatic phone movement respects a reported firmware STOP latch.
 
 House lights reboot **OFF**, with selected brightness **100%** in RAM. OFF preserves brightness; ON at 0% has no visible output. Lighting and device config/buzzer settings are not persisted across reboot in this uploaded implementation. This replaces the old repository's NVS buzzer-persistence behavior with the uploaded source's existing RAM-only policy; the new compatibility route follows that policy.
 
@@ -100,3 +100,5 @@ g++ -std=c++17 -Ifirmware/tests/stubs \
 ```
 
 Test real hardware with the original rack baseline first, then add one properly driven/current-limited LED at a time. Verify all six zones independently, distinct brightness values, zero, OFF/ON retention, reboot-OFF, loss/recovery of Wi-Fi, PWM availability failures, and status-priority overlaps. Recheck dry extension, rain retraction, latched STOP, manual commands, sensor diagnostics and buzzer patterns during lighting traffic. Confirm RGB type/pinout before enabling its optional code.
+
+An explicit STOP can still be attempted at the actively requested rack address when telemetry is in error (for example DHT HTTP 503). It must receive an actual command acknowledgement; failure remains unconfirmed. An explicit Disconnect disables these attempts. Emergency STOP is best-effort software control, not proof of physical motion cessation.

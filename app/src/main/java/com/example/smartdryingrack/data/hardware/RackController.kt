@@ -28,3 +28,12 @@ interface DeviceSimulator {
     fun setSensorError(on: Boolean)
     suspend fun setOffline(offline: Boolean)
 }
+
+/** Optional device-authoritative settings; legacy/mock controllers keep local phone mode. */
+interface DeviceRackSettings {
+    val canAttemptStop: Boolean get() = false
+    val deviceMode: kotlinx.coroutines.flow.StateFlow<com.example.smartdryingrack.domain.model.RackMode?>
+    val modeSupported: kotlinx.coroutines.flow.StateFlow<Boolean>
+    val stopLatched: kotlinx.coroutines.flow.StateFlow<Boolean?>
+    suspend fun setDeviceMode(mode: com.example.smartdryingrack.domain.model.RackMode)
+}

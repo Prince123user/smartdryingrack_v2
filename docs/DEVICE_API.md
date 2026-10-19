@@ -46,7 +46,7 @@ Actions: `EXTEND`, `RETRACT`, `STOP`. A successful HTTP 200/202 response must in
 
 The app does not intentionally retry motor commands. Firmware must deduplicate requestId and return the same acknowledgement for a duplicate. Rejection can use a non-2xx response or `{"accepted":false}`. An acknowledgement is acceptance, not physical completion. The app watches status for the requested terminal position. If it is not reached within ten seconds, a stop is attempted and the app enters a fault state; reconnect after inspecting the rack. Adapt this timeout for your physical travel time before commissioning.
 
-Manual movement is blocked for unknown/faulted positions. Extension also requires fresh, valid and dry telemetry. Stop is permitted even when position is unknown. An emergency stop holds automation even if the request cannot be confirmed; a successfully accepted manual movement releases the hold. Selecting Auto alone does not release it. Movement defaults to Manual after every process restart, and a new schedule starts disabled.
+Manual movement is blocked for unknown/faulted positions. Extension also requires fresh, valid and dry telemetry. Stop is permitted even when position is unknown. An emergency stop holds automation even if the request cannot be confirmed; a successfully accepted manual movement releases the hold. Selecting Auto alone does not release it. The phone starts with a local Manual default, then follows reported firmware mode when supported. Auto/Manual changes use POST /api/config and require confirmation. A new schedule starts disabled.
 
 ## Firmware responsibilities
 
@@ -79,3 +79,5 @@ App automation runs only while the process is alive and connected. It is not a b
 Rain-triggered app retraction requires current, fresh wet telemetry and confirmation; a stale debounce confirmation is insufficient when the latest reading is dry. Explicit schedules may still retract on dry days when enabled. New schedules default to disabled.
 
 The current firmware is based on the uploaded working sketch. See [firmware 1.1.1](ESP32_FIRMWARE.md) and [the implemented lighting API](LIGHTING_API.md) for its additive routes, volatile settings, stable-dry AUTO behavior and GPIO allocation.
+
+For the merged firmware, phone automation respects the device STOP latch and leaves rain protection to the device. Explicit STOP attempts are allowed during telemetry errors at the actively requested address, with normal acknowledgement/error handling; explicit Disconnect still prevents requests.

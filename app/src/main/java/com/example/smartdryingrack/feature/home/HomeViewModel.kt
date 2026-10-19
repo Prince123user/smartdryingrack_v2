@@ -41,7 +41,8 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _message = MutableStateFlow<String?>(null)
-    val message = _message.asStateFlow()
+    val message = combine(_message, rack.modeMessage) { local, mode -> mode ?: local }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     fun setAutoMode(enabled: Boolean) { rack.setMode(if (enabled) RackMode.AUTO else RackMode.MANUAL) }
 
     fun retract() { viewModelScope.launch {

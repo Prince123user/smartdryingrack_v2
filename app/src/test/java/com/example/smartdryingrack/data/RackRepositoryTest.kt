@@ -11,7 +11,7 @@ import org.junit.Test
 import org.mockito.Mockito.mock
 
 class RackRepositoryTest {
-    private class Controller : RackController {
+    private open class Controller : RackController {
         val state = MutableStateFlow(RackState.RETRACTED)
         val sensors = MutableStateFlow<SensorData?>(SensorData(29f, 60f, false, null, System.currentTimeMillis()))
         val connection = MutableStateFlow(ConnectionState.ONLINE)
@@ -26,6 +26,21 @@ class RackRepositoryTest {
         override suspend fun connect() {}
         override suspend fun disconnect() { connection.value = ConnectionState.OFFLINE }
         override suspend fun isConnected() = connection.value == ConnectionState.ONLINE
+    }
+    private class SettingsController : Controller(), com.example.smartdryingrack.data.hardware.DeviceRackSettings {
+        override val canAttemptStop: Boolean get() = true
+        override val deviceMode = MutableStateFlow<RackMode?>(RackMode.AUTO)
+        override val modeSupported = MutableStateFlow(true)
+        override val stopLatched = MutableStateFlow<Boolean?>(false)
+        val modeRequests = java.util.concurrent.CopyOnWriteArrayList<RackMode>()
+        var modeGate: CompletableDeferred<Unit>? = null
+        var modeFailure = false
+        override suspend fun setDeviceMode(mode: RackMode) {
+            modeRequests += mode
+            modeGate?.await()
+            if (modeFailure) throw java.io.IOException("offline")
+            deviceMode.value = mode
+        }
     }
     private suspend fun ready(controller: Controller): RackRepository {
         val repository = RackRepository(controller, mock(EventLog::class.java))
@@ -147,4 +162,54 @@ class RackRepositoryTest {
         assertEquals(CommandResult.Rejected(RejectReason.EMERGENCY_HOLD), repository.send(RackAction.EXTEND, CommandSource.SCHEDULE))
         assertTrue(controller.commands.isEmpty())
     }
+    @Test fun modeChangesWaitForDeviceConfirmationAndBlockMotionUntilConfirmed() = runBlocking {
+        val controller = SettingsController()
+        val repository = ready(controller)
+        withTimeout(2000) { repository.mode.first { it == RackMode.AUTO } }
+        controller.modeGate = CompletableDeferred()
+        repository.setMode(RackMode.MANUAL)
+        withTimeout(2000) { while (controller.modeRequests.isEmpty()) delay(1) }
+        assertEquals(RackMode.AUTO, repository.mode.value)
+        assertEquals(CommandResult.Rejected(RejectReason.BUSY), repository.send(RackAction.EXTEND, CommandSource.MANUAL))
+        repository.setMode(RackMode.AUTO)
+        assertEquals(listOf(RackMode.MANUAL), controller.modeRequests.toList())
+        controller.modeGate!!.complete(Unit)
+        withTimeout(2000) { repository.mode.first { it == RackMode.MANUAL } }
+        Unit
+    }
+
+    @Test fun rejectedModeDoesNotPretendToChangeTheDeviceOrAutomaticallyRetry() = runBlocking {
+        val controller = SettingsController().also { it.modeFailure = true }
+        val repository = ready(controller)
+        withTimeout(2000) { repository.mode.first { it == RackMode.AUTO } }
+        repository.setMode(RackMode.MANUAL)
+        withTimeout(2000) { repository.modeMessage.first { it?.contains("not confirmed") == true } }
+        assertEquals(RackMode.AUTO, repository.mode.value)
+        assertEquals(listOf(RackMode.MANUAL), controller.modeRequests.toList())
+    }
+
+    @Test fun firmwareStopLatchPreventsPhoneAutomationFromResumingAfterAppRestart() = runBlocking {
+        val controller = SettingsController().also {
+            it.stopLatched.value = true; it.state.value = RackState.STOPPED
+        }
+        val repository = ready(controller)
+        assertEquals(CommandResult.Rejected(RejectReason.EMERGENCY_HOLD), repository.send(RackAction.EXTEND, CommandSource.SCHEDULE))
+        assertEquals(CommandResult.Rejected(RejectReason.EMERGENCY_HOLD), repository.send(RackAction.RETRACT, CommandSource.RAIN))
+        assertTrue(controller.commands.isEmpty())
+    }
+
+    @Test fun firmwareRainAutomationIsNotInterruptedByRedundantPhoneCommands() = runBlocking {
+        val controller = SettingsController().also { it.state.value = RackState.RETRACTING }
+        val repository = ready(controller)
+        assertEquals(CommandResult.Rejected(RejectReason.ALREADY_THERE), repository.send(RackAction.RETRACT, CommandSource.RAIN))
+        assertTrue(controller.commands.isEmpty()) // In particular, no STOP followed by RETRACT.
+    }
+
+    @Test fun explicitStopIsAttemptedWhenRequestedDeviceHasATelemetryError() = runBlocking {
+        val controller = SettingsController().also { it.connection.value = ConnectionState.ERROR }
+        val repository = ready(controller)
+        assertEquals(CommandResult.Accepted, repository.send(RackAction.STOP, CommandSource.EMERGENCY))
+        assertEquals(listOf("STOP"), controller.commands)
+    }
+
 }

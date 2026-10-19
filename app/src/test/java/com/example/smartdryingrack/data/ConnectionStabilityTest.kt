@@ -239,4 +239,26 @@ class ConnectionStabilityTest {
             assertEquals(listOf("/api/status", "/api/commands", "/api/status"), paths)
         }
     }
+    @Test fun sensorFailureDoesNotPreventAnExplicitStopRequest() = runTest {
+        fixture(backgroundScope).use { f ->
+            f.server.dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest) = when (request.path) {
+                    "/api/status" -> MockResponse().setResponseCode(503).setBody("{\"error\":\"SENSOR_FAILURE\"}")
+                    "/api/commands" -> MockResponse().setBody("{\"accepted\":true}")
+                    else -> MockResponse().setResponseCode(404)
+                }
+            }
+            f.controller.connect(); runCurrent()
+            assertEquals(ConnectionState.ERROR, f.controller.observeConnection().value)
+            f.server.takeRequest()
+            f.controller.stop()
+            var request = f.server.takeRequest(1, TimeUnit.SECONDS)!!
+            while (request.path != "/api/commands") request = f.server.takeRequest(1, TimeUnit.SECONDS)!!
+            assertEquals("/api/commands", request.path)
+            assertEquals("STOP", org.json.JSONObject(request.body.readUtf8()).getString("action"))
+            f.controller.disconnect()
+            assertFalse(f.controller.canAttemptStop)
+        }
+    }
+
 }
