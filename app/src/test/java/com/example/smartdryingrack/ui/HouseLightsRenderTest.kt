@@ -160,7 +160,20 @@ class HouseLightsRenderTest {
         val actual = com.example.smartdryingrack.data.hardware.rest.parseLightingSnapshot(body)
         assertEquals(6, actual.zones.size)
         assertNull(actual.indicator)
+        assertEquals(false, actual.indicatorHardwareEnabled)
         assertTrue(actual.zones.values.all { it.lastRequestId == null && it.settings.brightness == 100 })
+    }
+    @Test fun disabledRgbExplainsFirmwareConfigurationWhileHouseControlsRemainIndependent() {
+        show(fixture().copy(indicator = null, indicatorHardwareEnabled = false), Actions())
+        compose.onNodeWithText("RGB output disabled in firmware").assertExists()
+        compose.onNodeWithText("Device state and meaning not reported").assertDoesNotExist()
+        compose.onAllNodes(hasContentDescription("brightness", substring = true)).assertCountEquals(6)
+        compose.onNodeWithContentDescription("Front power").assertIsEnabled()
+    }
+    @Test fun disconnectedRgbConfigurationIsClearlyMarkedAsLastReported() {
+        show(fixture().copy(connection = LightingConnection.ERROR, indicator = null, indicatorHardwareEnabled = false), Actions())
+        compose.onNodeWithText("Last reported configuration · reconnect to verify").assertExists()
+        compose.onNodeWithContentDescription("Front power").assertIsNotEnabled()
     }
 
 }

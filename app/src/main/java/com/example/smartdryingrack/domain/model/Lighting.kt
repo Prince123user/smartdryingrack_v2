@@ -38,7 +38,8 @@ data class StatusLightSettings(val power: Boolean, val rgb: Rgb, val brightness:
 data class ConfirmedZone(val settings: LightSettings, val revision: Long, val lastRequestId: String?, val available: Boolean = true)
 data class SystemStatusLight(val settings: StatusLightSettings, val meaning: String, val description: String, val pattern: String)
 data class LightingSnapshot(val deviceSession: String, val version: Long,
-                            val zones: Map<LightingZone, ConfirmedZone>, val indicator: SystemStatusLight?)
+                            val zones: Map<LightingZone, ConfirmedZone>, val indicator: SystemStatusLight?,
+                            val indicatorHardwareEnabled: Boolean? = null)
 data class LightingUpdate(val zone: LightingZone, val deviceSession: String, val expectedRevision: Long,
                           val requestId: String, val settings: LightSettings)
 data class LightingAcknowledgement(val requestId: String, val zone: LightingZone, val deviceSession: String, val revision: Long)

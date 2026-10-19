@@ -8,7 +8,7 @@ Firmware **1.1.2** in `firmware/SmartDryingRack/SmartDryingRack.ino` is merged f
 
 The sketch uses the upload's six direct ESP32 LEDC outputs, not the superseded external-PWM plan. See [firmware/build guide](ESP32_FIRMWARE.md) and [source-aligned wiring](LIGHTING_WIRING.md). The app and firmware are built/tested in software; actual electrical operation and the board-specific circuit are not physically verified. Credentials are placeholders in the repository and must be configured locally.
 
-RGB hardware output remains disabled until its type/pinout are confirmed. GET returns `indicator:null` in that configuration; legacy `statusIndicator` reports desired logical colors with `hardwareEnabled:false` for diagnostics only. The app must not display those logical values as a physical light state.
+RGB hardware output remains disabled until its type/pinout are confirmed. GET returns `indicator:null` in that configuration; legacy `statusIndicator` reports desired logical colors with `hardwareEnabled:false` for diagnostics only. The app reads the strictly boolean `statusIndicator.hardwareEnabled` as configuration metadata and shows an explicit disabled message when false. A missing flag remains unknown; true with `indicator:null` means enabled but actual state unreported. False with a non-null physical indicator is rejected as inconsistent. Cached configuration is labeled last reported after disconnection. The app must not display the legacy logical colors/reason as a physical light state.
 
 GET 404/501 disables lighting controls; a timeout is separately reported as an unreachable rack, never proof that firmware support is absent. The app rejects earlier RGB house-zone schema 1 instead of writing an incompatible request.
 

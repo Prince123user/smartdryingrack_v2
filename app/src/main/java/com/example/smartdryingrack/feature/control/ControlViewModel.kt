@@ -85,7 +85,7 @@ class ControlViewModel @Inject constructor(
     private val buzzerUpdating = MutableStateFlow(false)
     private val deviceMessage = MutableStateFlow<String?>(null)
     private data class DeviceControls(val buzzer: Boolean?, val updating: Boolean, val message: String?, val raw: Int?, val reason: String?)
-    private val settingsMessage = combine(deviceMessage, rack.modeMessage) { local, mode -> mode ?: local }
+    private val settingsMessage = combine(deviceMessage, rack.modeMessage, controller.message) { local, mode, connection -> connection ?: mode ?: local }
     private val deviceControls = combine(controller.buzzerEnabled, buzzerUpdating, settingsMessage, controller.rainRaw, controller.motionReason) { buzzer, updating, message, raw, reason ->
         DeviceControls(buzzer, updating, message, raw, reason)
     }
@@ -109,7 +109,7 @@ class ControlViewModel @Inject constructor(
             try { controller.setBuzzer(enabled) }
             catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                deviceMessage.value = e.message ?: "Buzzer setting could not be confirmed."
+                deviceMessage.value = "Buzzer setting not confirmed. " + com.example.smartdryingrack.data.hardware.rest.connectionFailureMessage(e)
             } finally { buzzerUpdating.value = false }
         }
     }

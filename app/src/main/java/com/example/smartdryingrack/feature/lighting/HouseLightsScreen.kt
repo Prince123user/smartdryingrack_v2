@@ -80,7 +80,8 @@ fun HouseLightsScreen(state: HouseLightingState, actions: LightingActions, onCon
                 Text("Connection settings")
             }
         }
-        StatusLightCard(state.indicator, stale = state.connection != LightingConnection.READY)
+        StatusLightCard(state.indicator, hardwareEnabled = state.indicatorHardwareEnabled,
+            stale = state.connection != LightingConnection.READY)
         Text("House zones", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
         LightingZone.entries.forEach { id ->
             key(id) {
@@ -94,7 +95,7 @@ fun HouseLightsScreen(state: HouseLightingState, actions: LightingActions, onCon
 }
 
 @Composable
-private fun StatusLightCard(indicator: SystemStatusLight?, stale: Boolean) {
+private fun StatusLightCard(indicator: SystemStatusLight?, hardwareEnabled: Boolean?, stale: Boolean) {
     GlassCard(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             NeonIcon(Icons.Outlined.Info)
@@ -105,7 +106,16 @@ private fun StatusLightCard(indicator: SystemStatusLight?, stale: Boolean) {
         }
         Spacer(Modifier.height(12.dp))
         if (indicator == null) {
-            Text("Device state and meaning not reported", color = AppColors.TextSecondary)
+            Text(when (hardwareEnabled) {
+                false -> "RGB output disabled in firmware"
+                true -> "RGB output enabled · actual state not reported"
+                null -> "Device state and meaning not reported"
+            }, color = AppColors.TextPrimary, fontWeight = FontWeight.SemiBold)
+            if (hardwareEnabled == false) Text("Confirm the RGB LED’s common-anode/common-cathode type and pinout before enabling its firmware output. House lights work independently.",
+                color = AppColors.TextSecondary, style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 8.dp))
+            if (stale && hardwareEnabled != null) Text("Last reported configuration · reconnect to verify",
+                color = AppColors.Warning, style = MaterialTheme.typography.bodySmall)
         } else {
             ColorSwatch(indicator.settings.rgb, Modifier.fillMaxWidth().height(44.dp), "Device-reported status color")
             Spacer(Modifier.height(8.dp))

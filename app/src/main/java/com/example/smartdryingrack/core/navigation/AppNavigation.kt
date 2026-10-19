@@ -171,7 +171,7 @@ fun SmartDryingRackRoot(viewModel: SettingsViewModel = hiltViewModel(), startDes
                     )
                 }
                 composable(Destination.HOME.route) { HomeRoute(onConnect = { nav.navigate("device_settings") }, onControl = { nav.navigateToTab(Destination.CONTROL) }, onHouseLights = { nav.navigate("house_lights") { launchSingleTop = true } }) }
-                composable(Destination.CONTROL.route) { ControlRoute(onHouseLights = { nav.navigate("house_lights") { launchSingleTop = true } }) }
+                composable(Destination.CONTROL.route) { ControlRoute(onHouseLights = { nav.navigate("house_lights") { launchSingleTop = true } }, onConnectionSettings = { nav.navigate("device_settings") { launchSingleTop = true } }) }
                 composable(Destination.ALERTS.route) { AlertsRoute() }
                 composable("house_lights") { HouseLightsRoute(onConnectionSettings = { nav.navigate("device_settings") { launchSingleTop = true } }) }
                 composable("notifications") {

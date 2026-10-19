@@ -31,6 +31,22 @@ class LightingRepositoryTest {
     private val front = LightingZone.FRONT
     private val left = LightingZone.LEFT
 
+    @Test fun rgbAvailabilityComesFromDeviceAndIsRetainedOnlyAsStaleAfterReadFailure() = runTest {
+        val device = Device().also { it.snapshot = it.snapshot.copy(indicator = null, indicatorHardwareEnabled = false) }
+        val repo = LightingRepository(device, backgroundScope)
+        repo.open("rack"); runCurrent()
+        assertEquals(false, repo.state.value.indicatorHardwareEnabled)
+        assertNull(repo.state.value.indicator)
+        repo.brightness(front, 25); advanceTimeBy(401); runCurrent()
+        assertEquals(false, repo.state.value.indicatorHardwareEnabled)
+        assertEquals(25, repo.state.value.zones.getValue(front).confirmed!!.settings.brightness)
+        device.readFailure = IOException("unavailable")
+        advanceTimeBy(2000); runCurrent()
+        assertEquals(LightingConnection.ERROR, repo.state.value.connection)
+        assertEquals(false, repo.state.value.indicatorHardwareEnabled)
+        assertNull(repo.state.value.indicator)
+    }
+
     @Test fun allSixZonesAreIsolatedAndStatusCannotBeTargeted() = runTest {
         val device = Device(); val repo = LightingRepository(device, backgroundScope)
         repo.open("rack"); runCurrent()

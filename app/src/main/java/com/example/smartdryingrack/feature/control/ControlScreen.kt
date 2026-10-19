@@ -63,9 +63,9 @@ import java.time.format.TextStyle
 import java.util.Locale
 
 @Composable
-fun ControlRoute(onHouseLights: () -> Unit = {}, viewModel: ControlViewModel = hiltViewModel()) {
+fun ControlRoute(onHouseLights: () -> Unit = {}, onConnectionSettings: () -> Unit = {}, viewModel: ControlViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    ControlScreen(state, viewModel, onHouseLights)
+    ControlScreen(state, viewModel, onHouseLights, onConnectionSettings)
 }
 
 @StringRes
@@ -90,18 +90,26 @@ private fun RejectReason.res(): Int = when (this) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ControlScreen(state: ControlUiState, actions: ControlActions, onHouseLights: () -> Unit = {}) {
+fun ControlScreen(state: ControlUiState, actions: ControlActions, onHouseLights: () -> Unit = {}, onConnectionSettings: () -> Unit = {}) {
+    val online = state.connection == com.example.smartdryingrack.domain.model.ConnectionState.ONLINE
     ScreenColumn {
         ModeSelector(state.mode, actions::setMode, Modifier.fillMaxWidth())
         com.example.smartdryingrack.core.designsystem.NeonFeatureRow("House Lights", "Control six independent dimmable LEDs", Icons.Outlined.Lightbulb, onHouseLights)
 
-        com.example.smartdryingrack.core.designsystem.RackHero(state.rackState)
-        if (state.pendingMovement != null) {
-            Text("Movement accepted. Waiting for position confirmation.", color = AppColors.Primary)
-        } else if (state.connection != com.example.smartdryingrack.domain.model.ConnectionState.ONLINE) {
-            Text("Connect your rack before using movement controls.", color = AppColors.TextSecondary)
+        if (!online) {
+            GlassCard(Modifier.fillMaxWidth(), AppColors.Warning) {
+                Text(if (state.pendingMovement != null) "Connection lost · movement outcome unknown" else "Rack connection unavailable",
+                    color = AppColors.Warning, fontWeight = FontWeight.Bold)
+                Text("Current movement and position cannot be verified. Check the rack before retrying a command.",
+                    color = AppColors.TextSecondary, style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = onConnectionSettings) { Text("Connection settings") }
+            }
+        }
+        com.example.smartdryingrack.core.designsystem.RackHero(if (online) state.rackState else com.example.smartdryingrack.domain.model.RackState.UNKNOWN)
+        if (online && state.pendingMovement != null) {
+            Text("Movement accepted. Waiting for updated device state.", color = AppColors.Primary)
         } else if (state.rackState in setOf(com.example.smartdryingrack.domain.model.RackState.UNKNOWN, com.example.smartdryingrack.domain.model.RackState.ERROR)) {
-            Text("Position is unknown or faulted. Inspect your rack and reconnect before moving it.", color = AppColors.Warning)
+            if (online) Text("Position is unknown or faulted. Inspect your rack and reconnect before moving it.", color = AppColors.Warning)
         }
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -111,6 +119,7 @@ fun ControlScreen(state: ControlUiState, actions: ControlActions, onHouseLights:
                 state.availability.retract == null, { actions.send(RackAction.RETRACT) }, Modifier.weight(1f))
         }
         com.example.smartdryingrack.core.designsystem.NeonToggleRow("Buzzer", when {
+            !online -> "Connection unavailable · reconnect to confirm sound setting"
             state.buzzerUpdating -> "Waiting for device confirmation…"
             state.buzzerEnabled == null -> "Requires updated ESP32 firmware (1.1.0+)"
             state.buzzerEnabled -> "Sound enabled · toggle on to test a short beep"
@@ -119,7 +128,7 @@ fun ControlScreen(state: ControlUiState, actions: ControlActions, onHouseLights:
             onChange = actions::setBuzzerEnabled,
             enabled = state.connection == com.example.smartdryingrack.domain.model.ConnectionState.ONLINE && state.buzzerEnabled != null && !state.buzzerUpdating)
         state.deviceMessage?.let { Text(it, color = AppColors.Warning, style = MaterialTheme.typography.bodySmall) }
-        state.rainRaw?.let { Text("Rain sensor raw: $it · check dry/wet calibration",
+        state.rainRaw?.let { Text("${if (online) "Rain sensor raw" else "Last rain sensor raw (stale)"}: $it · check dry/wet calibration",
             style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary) }
         state.motionReason?.let { Text("Device movement reason: " + it.lowercase().replace('_', ' '),
             style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary) }

@@ -32,7 +32,8 @@ data class HouseLightingState(
     val version: Long? = null,
     val error: String? = null,
     val lastSyncedAt: Long? = null,
-    val problem: LightingProblem? = null
+    val problem: LightingProblem? = null,
+    val indicatorHardwareEnabled: Boolean? = null
 )
 
 /** Owned by the screen ViewModel. Calls/state transitions are confined to its UI coroutine scope.
@@ -126,6 +127,7 @@ class LightingRepository(private val api: LightingGateway, private val scope: Co
             }
             _state.update { state ->
                 state.copy(connection = LightingConnection.READY, indicator = snapshot.indicator,
+                    indicatorHardwareEnabled = snapshot.indicatorHardwareEnabled,
                     deviceSession = snapshot.deviceSession, version = snapshot.version, error = null, problem = null, lastSyncedAt = now(),
                     zones = state.zones.mapValues { (id, ui) ->
                         val actual = snapshot.zones.getValue(id)

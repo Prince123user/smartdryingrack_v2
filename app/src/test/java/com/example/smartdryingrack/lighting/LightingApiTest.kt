@@ -54,6 +54,19 @@ class LightingApiTest {
         val json = snapshotJson().put("indicator", JSONObject.NULL)
         assertNull(parseLightingSnapshot(json.toString()).indicator)
     }
+    @Test fun readsDisabledRgbHardwareWithoutInventingItsLogicalColor() {
+        val json = snapshotJson().put("indicator", JSONObject.NULL).put("statusIndicator",
+            JSONObject().put("hardwareEnabled", false).put("reason", "DRY_EXTENDED").put("g", 255))
+        val state = parseLightingSnapshot(json.toString())
+        assertEquals(false, state.indicatorHardwareEnabled)
+        assertNull(state.indicator)
+        json.getJSONObject("statusIndicator").put("hardwareEnabled", "false")
+        assertThrows(LightingProtocolException::class.java) { parseLightingSnapshot(json.toString()) }
+    }
+    @Test fun rejectsDisabledHardwareThatAlsoClaimsActualRgbState() {
+        val json = snapshotJson().put("statusIndicator", JSONObject().put("hardwareEnabled", false))
+        assertThrows(LightingProtocolException::class.java) { parseLightingSnapshot(json.toString()) }
+    }
     @Test fun deviceReportsZoneAvailabilityWithoutInventingSuccess() {
         val json = snapshotJson()
         json.getJSONArray("zones").getJSONObject(0).put("available", false)

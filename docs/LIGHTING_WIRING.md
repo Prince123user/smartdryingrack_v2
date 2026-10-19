@@ -48,7 +48,7 @@ Firmware drives house outputs low/OFF at startup and retains 100% selected brigh
 
 The uploaded optional implementation is specifically for a plain four-pin RGB LED with per-channel current limiting. Reserved signals are R GPIO26, G GPIO32, B GPIO33. It uses digital ON/OFF color channels, not PWM dimming. `STATUS_RGB_ENABLED=false` must remain unchanged until the part/pinout and circuit are confirmed.
 
-Common-cathode, common-anode, addressable WS2812-style and two-wire cycling LEDs are not interchangeable. The optional common-anode direct-signal code is limited to a 3.3 V common connection, never 5 V at a GPIO. Higher voltage/current parts need suitable separate drivers and potentially different polarity. Do not wire or enable these outputs based on colors alone. The app shows the physical indicator as not reported while hardware output is disabled, even though the firmware exposes its logical desired status for diagnostics.
+Common-cathode, common-anode, addressable WS2812-style and two-wire cycling LEDs are not interchangeable. The optional common-anode direct-signal code is limited to a 3.3 V common connection, never 5 V at a GPIO. Higher voltage/current parts need suitable separate drivers and potentially different polarity. Do not wire or enable these outputs based on colors alone. The app shows “RGB output disabled in firmware” when `statusIndicator.hardwareEnabled` is explicitly false. It does not display the logical desired colors as physical output. Cached configuration is marked last reported when disconnected.
 
 ## Required parts and remaining inputs
 

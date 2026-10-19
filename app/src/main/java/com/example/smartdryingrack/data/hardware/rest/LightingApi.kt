@@ -100,7 +100,16 @@ private fun parseLightingPayload(json: JSONObject): LightingSnapshot {
             color.integer("g", 255).toInt(), color.integer("b", 255).toInt()), status.integer("brightness", 100).toInt())
         SystemStatusLight(settings, status.text("meaning"), status.text("description", 256), pattern)
     }
-    return LightingSnapshot(session, version, zones, indicator)
+    // Uploaded firmware reports this flag separately from its desired logical colors.
+    // Never turn the legacy reason/r/g/b fields into confirmed physical RGB state.
+    val legacyStatus = json.optJSONObject("statusIndicator")
+    val hardwareEnabled = if (legacyStatus?.has("hardwareEnabled") == true) {
+        val enabled = legacyStatus.get("hardwareEnabled")
+        require(enabled is Boolean) { "Invalid status-indicator hardware availability." }
+        enabled
+    } else null
+    require(hardwareEnabled != false || indicator == null) { "Disabled status-indicator hardware cannot report an active indicator state." }
+    return LightingSnapshot(session, version, zones, indicator, hardwareEnabled)
 }
 
 /** Schema 2: ordinary dimmable house LEDs; RGB is reserved for the read-only indicator. */

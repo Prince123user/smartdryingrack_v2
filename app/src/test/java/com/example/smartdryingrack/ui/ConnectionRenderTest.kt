@@ -86,4 +86,28 @@ class ConnectionRenderTest {
         compose.onNodeWithText("Firmware: 1.1.4", substring = true).performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Last reading (stale):", substring = true).assertDoesNotExist()
     }
+    @Test fun lostConnectionCannotPresentAnAcceptedMovementAsCurrentRetraction() {
+        var opened = false
+        val actions = org.mockito.Mockito.mock(com.example.smartdryingrack.feature.control.ControlActions::class.java)
+        compose.runOnUiThread {
+            compose.activity.setContent {
+                SmartDryingRackTheme {
+                    com.example.smartdryingrack.feature.control.ControlScreen(
+                        com.example.smartdryingrack.feature.control.ControlUiState(
+                            connection = ConnectionState.ERROR,
+                            rackState = com.example.smartdryingrack.domain.model.RackState.RETRACTING,
+                            pendingMovement = com.example.smartdryingrack.domain.model.RackState.RETRACTED),
+                        actions, onConnectionSettings = { opened = true })
+                }
+            }
+        }
+        compose.onNodeWithText("Connection lost · movement outcome unknown").assertExists()
+        compose.onNodeWithText("Connection settings").performClick()
+        assertTrue(opened)
+        compose.onNodeWithText("Movement accepted. Waiting for updated device state.").assertDoesNotExist()
+        compose.onNodeWithText("RETRACTING…").assertDoesNotExist()
+        compose.onNodeWithText("Position unknown").assertExists()
+        compose.onNodeWithText("Extend", useUnmergedTree = true).performScrollTo().assertExists()
+        org.mockito.Mockito.verifyNoInteractions(actions)
+    }
 }
