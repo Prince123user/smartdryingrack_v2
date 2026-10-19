@@ -47,7 +47,8 @@ inline void pinMode(int,int){}
 inline void digitalWrite(int,int){}
 inline void analogReadResolution(int){}
 inline void analogSetPinAttenuation(int,int){}
-inline int analogRead(int){return fakeADC;}
+inline std::vector<int> adcSamples;
+inline int analogRead(int){if(adcSamples.empty())return fakeADC;int v=adcSamples.front();adcSamples.erase(adcSamples.begin());return v;}
 inline int digitalRead(int){return fakeDigital;}
 inline int constrain(int n,int low,int high){return min(high,max(low,n));}
 inline void tone(int,int,int){tones++;}
@@ -91,3 +92,6 @@ inline bool ledcAttachChannel(int pin,int frequency,int bits,int channel) {
 inline bool ledcWrite(int pin,int duty){if(pin==failedPwmPin)return false;pwmDuty[pin]=duty;return true;}
 inline double ledcWriteTone(int pin,int hz){pwmDuty[pin]=hz;if(hz)tones++;else stops++;return hz;}
 inline uint32_t esp_random(){static uint32_t v=100;return ++v;}
+
+inline uint32_t ledcRead(int pin){return pwmDuty[pin];}
+inline uint32_t ledcReadFreq(int pin){return pwmChannels.count(pin)?1000:0;}

@@ -1,5 +1,5 @@
-/* Release 1.1.2: combines the latest uploaded status-label / sensor-error
- * improvements with the checked Android-compatible lighting and buzzer APIs.
+/* Release 1.1.3: adds a nonblocking five-sample rain median filter and
+ * PWM duty/frequency readback for diagnosing brightness with the compatible app.
  * Retains schema 2, per-zone guarded writes, boot sessions, revisions,
  * buzzerEnabled, nested rainRaw, latched STOP and stable-dry AUTO behavior.
  * Configure Wi-Fi locally. RGB remains disabled until hardware is identified.
@@ -159,7 +159,7 @@ constexpr unsigned long DHT_MAX_AGE_MS = 6000;
 // Classic ESP32 WROOM-32 only: buzzer uses LEDC channel 14 (low-speed timer 3).
 // ESP32Servo is restricted to timer 0 below to keep its 50 Hz PWM separate.
 constexpr uint8_t BUZZER_LEDC_CHANNEL = 14;
-constexpr char FIRMWARE_VERSION[] = "1.1.2";
+constexpr char FIRMWARE_VERSION[] = "1.1.3";
 
 // Six SINGLE-COLOR house LEDs, driven through suitable active-high drivers.
 // GPIO -> driver input, NOT an unrestricted 5 V LED load. Use LED current limiting.
@@ -222,6 +222,12 @@ float rawHumidityPercent = NAN;
 uint32_t dhtReadFailures = 0;
 
 int lastRainRaw = 0;
+int lastRainFiltered = 0;
+constexpr uint8_t RAIN_FILTER_SAMPLES = 5;
+int rainSamples[RAIN_FILTER_SAMPLES] = {};
+uint8_t rainSampleCount = 0, rainSampleNext = 0;
+
+
 bool rainWet = false;
 bool rainConfirmed = false;
 uint8_t wetReadings = 0;
@@ -462,20 +468,37 @@ void updateDht() {
   if (!dhtReady()) ++dhtReadFailures;
 }
 
+// One sample per normal rain tick: no delays or blocking ADC bursts.
+int filterRainSample(int sample) {
+  rainSamples[rainSampleNext] = sample;
+  rainSampleNext = (rainSampleNext + 1) % RAIN_FILTER_SAMPLES;
+  if (rainSampleCount < RAIN_FILTER_SAMPLES) ++rainSampleCount;
+  int sorted[RAIN_FILTER_SAMPLES];
+  for (uint8_t i = 0; i < rainSampleCount; ++i) {
+    sorted[i] = rainSamples[i];
+    for (uint8_t j = i; j > 0 && sorted[j] < sorted[j - 1]; --j) {
+      int previous = sorted[j - 1]; sorted[j - 1] = sorted[j]; sorted[j] = previous;
+    }
+  }
+  return sorted[rainSampleCount / 2];
+}
+
 bool readRainWet() {
   if (USE_RAIN_DIGITAL_OUTPUT) {
     bool active = digitalRead(RAIN_DO_PIN) == (RAIN_DIGITAL_ACTIVE_LOW ? LOW : HIGH);
     lastRainRaw = digitalRead(RAIN_DO_PIN);
+    lastRainFiltered = lastRainRaw;
     rainWet = active;
     return active;
   }
   lastRainRaw = analogRead(RAIN_AO_PIN);
+  lastRainFiltered = filterRainSample(lastRainRaw);
   if (RAIN_WET_WHEN_ANALOG_BELOW) {
-    if (!rainWet && lastRainRaw <= RAIN_THRESHOLD) rainWet = true;
-    if (rainWet && lastRainRaw >= RAIN_THRESHOLD + RAIN_HYSTERESIS) rainWet = false;
+    if (!rainWet && lastRainFiltered <= RAIN_THRESHOLD) rainWet = true;
+    if (rainWet && lastRainFiltered >= RAIN_THRESHOLD + RAIN_HYSTERESIS) rainWet = false;
   } else {
-    if (!rainWet && lastRainRaw >= RAIN_THRESHOLD) rainWet = true;
-    if (rainWet && lastRainRaw <= RAIN_THRESHOLD - RAIN_HYSTERESIS) rainWet = false;
+    if (!rainWet && lastRainFiltered >= RAIN_THRESHOLD) rainWet = true;
+    if (rainWet && lastRainFiltered <= RAIN_THRESHOLD - RAIN_HYSTERESIS) rainWet = false;
   }
   return rainWet;
 }
@@ -532,6 +555,7 @@ void printDiagnostics() {
   if (millis() - lastReportAt < 5000UL) return;
   lastReportAt = millis();
   Serial.print("Rain raw="); Serial.print(lastRainRaw);
+  Serial.print(" filtered="); Serial.print(lastRainFiltered);
   Serial.print(" wet="); Serial.print(rainWet);
   Serial.print(" confirmed="); Serial.print(rainConfirmed);
   Serial.print(" WiFi="); Serial.print((int)WiFi.status());
@@ -724,6 +748,11 @@ void handleSetConfig() {
 void handleDiagnostics() {
   JsonDocument doc;
   doc["rainRaw"] = lastRainRaw;
+  doc["rainFiltered"] = lastRainFiltered;
+  doc["rainFilterSamples"] = RAIN_FILTER_SAMPLES;
+  doc["rainSamplePeriodMs"] = RAIN_PERIOD_MS;
+  doc["rainWetWhenBelow"] = RAIN_WET_WHEN_ANALOG_BELOW;
+  doc["rainHysteresis"] = RAIN_HYSTERESIS;
   doc["rainWet"] = rainWet;
   doc["rainDetected"] = rainConfirmed;
   doc["rainThreshold"] = RAIN_THRESHOLD;
@@ -903,6 +932,9 @@ void handleGetLights() {
     light["brightness"] = houseLights[i].brightness;
     light["available"] = houseLights[i].available;
     light["type"] = "SINGLE_COLOR";
+    light["gpio"] = HOUSE_LIGHT_PINS[i];
+    light["pwmDutyReadback"] = ledcRead(HOUSE_LIGHT_PINS[i]);
+    light["pwmFrequencyHz"] = ledcReadFreq(HOUSE_LIGHT_PINS[i]);
     light["outputDuty"] = houseLights[i].power ? brightnessToDuty(houseLights[i].brightness) : 0;
   }
   JsonObject indicator = doc["statusIndicator"].to<JsonObject>();
@@ -1134,7 +1166,7 @@ void setup() {
   server.on("/api/buzzer", HTTP_OPTIONS, handleOptions);
   server.onNotFound(handleNotFound);
   server.begin();
-  Serial.println("SMART RACK 1.1.2 - APP COMPATIBLE LIGHTS AND STATUS FIXES");
+  Serial.println("SMART RACK 1.1.3 - APP COMPATIBLE LIGHTS AND STATUS FIXES");
   Serial.println("Smart Drying Rack API started; waiting for Wi-Fi");
   if (!STATUS_RGB_ENABLED) Serial.println("RGB status physical output disabled: confirm LED type before enabling");
 }
