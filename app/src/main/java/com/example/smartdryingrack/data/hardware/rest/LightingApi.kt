@@ -36,8 +36,33 @@ private fun JSONObject.settings(): LightSettings {
     return LightSettings(power, integer("brightness", 100).toInt())
 }
 
+/** Controlled diagnostics only: never surface a raw device body in an error message. */
+class LightingProtocolException(message: String) : IllegalArgumentException(message)
+
 fun parseLightingSnapshot(body: String): LightingSnapshot {
-    val json = JSONObject(body)
+    val json = try { JSONObject(body) } catch (_: Exception) {
+        throw LightingProtocolException("The lighting endpoint did not return a valid JSON object.")
+    }
+    val firmware = (json.opt("firmwareVersion") as? String)?.takeIf {
+        it.matches(Regex("[A-Za-z0-9._+-]{1,32}"))
+    }
+    val device = firmware?.let { "Firmware $it" } ?: "The device"
+    if (!json.has("schemaVersion") && json.has("lights")) {
+        throw LightingProtocolException("$device returned the older lights/statusIndicator format. Install the app-compatible firmware package with lighting schema 2.")
+    }
+    listOf("schemaVersion", "deviceSession", "stateVersion", "zones", "indicator").forEach { key ->
+        if (!json.has(key)) throw LightingProtocolException("$device omitted required lighting field '$key'.")
+    }
+    return try { parseLightingPayload(json) } catch (e: LightingProtocolException) { throw e }
+    catch (e: IllegalArgumentException) {
+        // All require() messages below are fixed application text, never device-provided values.
+        throw LightingProtocolException("$device: ${e.message ?: "Invalid lighting values."}")
+    } catch (_: org.json.JSONException) {
+        throw LightingProtocolException("$device returned a lighting field with a missing or incorrect JSON type.")
+    }
+}
+
+private fun parseLightingPayload(json: JSONObject): LightingSnapshot {
     require(json.integer("schemaVersion", 2) == 2L) { "Unsupported lighting schema." }
     val session = json.token("deviceSession")
     val version = json.integer("stateVersion")
@@ -46,7 +71,11 @@ fun parseLightingSnapshot(body: String): LightingSnapshot {
     val zones = mutableMapOf<LightingZone, ConfirmedZone>()
     repeat(array.length()) { index ->
         val zone = array.getJSONObject(index)
-        val id = LightingZone.fromId(zone.text("id"))
+        listOf("id", "power", "brightness", "revision", "lastRequestId").forEach { key ->
+            require(zone.has(key)) { "Zone ${index + 1} omitted required field '$key'." }
+        }
+        val id = LightingZone.entries.firstOrNull { it.id == zone.text("id") }
+            ?: throw IllegalArgumentException("Unknown house-light identifier in zone ${index + 1}.")
         require(id !in zones) { "Duplicate lighting zone." }
         val revision = zone.integer("revision")
         require(revision <= version) { "Zone revision exceeds snapshot version." }

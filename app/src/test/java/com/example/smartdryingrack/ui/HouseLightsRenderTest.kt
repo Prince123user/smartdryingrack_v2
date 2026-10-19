@@ -155,4 +155,12 @@ class HouseLightsRenderTest {
         compose.onNodeWithContentDescription("Left side power").assertIsEnabled()
     }
 
+    @Test fun androidJsonAcceptsTheRealFirmwareResponseIncludingNullIndicatorAndRequestIds() {
+        val body = javaClass.getResource("/firmware-lights-v1.1.2.json")!!.readText()
+        val actual = com.example.smartdryingrack.data.hardware.rest.parseLightingSnapshot(body)
+        assertEquals(6, actual.zones.size)
+        assertNull(actual.indicator)
+        assertTrue(actual.zones.values.all { it.lastRequestId == null && it.settings.brightness == 100 })
+    }
+
 }

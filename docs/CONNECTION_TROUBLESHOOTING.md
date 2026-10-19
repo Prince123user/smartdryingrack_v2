@@ -24,3 +24,9 @@ Do not increase GPIO loads, change power rails or rewrite working rain/STOP/serv
 | Both endpoints return valid JSON but the app fails | Report the endpoint status, app version and connection message; check the selected network/address. The app now prefers Android's active Wi-Fi when multiple Wi-Fi networks are exposed. |
 
 The merged firmware 1.1.1 now includes uploaded lighting PWM and legacy routes, plus schema-2 compatibility. Flashing an earlier uploaded 1.1.0 build still lacks the app-compatible schema-2 fields. Configure Wi-Fi locally before uploading 1.1.1. The earlier external-PWM/I²C plan is superseded; its GPIO21/22 connections conflict with this sketch’s house-light assignments. The app does not manufacture state, enable unknown outputs or claim that an unreachable device lacks an API.
+
+## Device replies but House Lights rejects the data
+
+Copy the actual `GET /api/lights` JSON from the phone browser before changing firmware again. The latest diagnostic APK distinguishes the older `lights`/`statusIndicator` format from missing schema-2 fields and invalid values, and includes a safe firmware-version label when reported. The generic error alone does not establish which field failed. A response containing only `lights` without `schemaVersion:2` and `zones` is not the current app contract. Do not remove validation or manufacture confirmed state to enable controls.
+
+The checked firmware response is tested both in the JVM parser suite and with Android JSON under Robolectric, including null indicator/request IDs. Passing those fixture tests does not establish what a physical device actually returns.

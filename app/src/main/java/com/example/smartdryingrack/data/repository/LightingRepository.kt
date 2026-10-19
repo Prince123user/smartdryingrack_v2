@@ -1,6 +1,7 @@
 package com.example.smartdryingrack.data.repository
 
 import com.example.smartdryingrack.data.hardware.rest.LightingGateway
+import com.example.smartdryingrack.data.hardware.rest.LightingProtocolException
 import com.example.smartdryingrack.data.hardware.rest.RackHttpException
 import com.example.smartdryingrack.data.hardware.rest.RackWifiUnavailableException
 import java.io.IOException
@@ -151,6 +152,7 @@ class LightingRepository(private val api: LightingGateway, private val scope: Co
                 problem == LightingProblem.WIFI_UNAVAILABLE -> "Connect your phone to the rack’s Wi-Fi network. Lighting state will retry automatically when Wi-Fi returns."
                 problem == LightingProblem.UNREACHABLE -> "The ESP32 did not respond at the configured address. Check its power and current IP in Connection settings, and keep your phone on the same Wi-Fi. Retrying automatically."
                 e is RackHttpException -> "The ESP32 replied with HTTP ${e.statusCode}, but lighting state is unavailable. Retrying automatically; check the firmware lighting service."
+                e is LightingProtocolException -> "${e.message} No settings were confirmed."
                 else -> "The ESP32 replied with incompatible or inconsistent lighting data. Check that its firmware supports the ordinary-LED lighting API (schema 2). No settings were confirmed."
             }
             _state.update { it.copy(connection = if (unsupported) LightingConnection.UNSUPPORTED else LightingConnection.ERROR,

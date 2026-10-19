@@ -231,4 +231,14 @@ class LightingRepositoryTest {
         assertFalse(repo.state.value.zones.getValue(left).confirmed!!.settings.power)
     }
 
+    @Test fun protocolMismatchShowsSpecificDiagnosticAndKeepsUnconfirmedZonesDisabled() = runTest {
+        val device = Device().also { it.readFailure = LightingProtocolException("Firmware 1.1.1 returned the older lights/statusIndicator format.") }
+        val repo = LightingRepository(device, backgroundScope)
+        repo.open("rack"); runCurrent()
+        assertEquals(LightingProblem.INVALID_STATE, repo.state.value.problem)
+        assertTrue(repo.state.value.error!!.contains("older lights/statusIndicator format"))
+        assertTrue(repo.state.value.zones.values.all { it.confirmed == null })
+        repo.power(front, true); runCurrent(); assertTrue(device.writes.isEmpty())
+    }
+
 }

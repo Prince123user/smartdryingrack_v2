@@ -68,6 +68,19 @@ class LightingApiTest {
         assertTrue(snapshot.zones.values.all { it.available && !it.settings.power && it.settings.brightness == 100 })
         assertNull(snapshot.indicator) // Logical colors with disabled hardware are not actual RGB state.
     }
+    @Test fun identifiesLegacyUploadedFirmwareInsteadOfOnlyReportingGenericFailure() {
+        val legacy = """{"firmwareVersion":"1.1.1","lights":[],"statusIndicator":{"automatic":true}}"""
+        val error = assertThrows(LightingProtocolException::class.java) { parseLightingSnapshot(legacy) }
+        assertTrue(error.message!!.contains("Firmware 1.1.1"))
+        assertTrue(error.message!!.contains("older lights/statusIndicator format"))
+    }
+    @Test fun reportsMissingFieldWithoutEchoingArbitraryDeviceContent() {
+        val json = snapshotJson().put("firmwareVersion", "untrusted secret content")
+        json.remove("deviceSession")
+        val error = assertThrows(LightingProtocolException::class.java) { parseLightingSnapshot(json.toString()) }
+        assertTrue(error.message!!.contains("deviceSession"))
+        assertFalse(error.message!!.contains("secret"))
+    }
     private val update = LightingUpdate(LightingZone.BALCONY, "test-boot", 0, "test-request",
         LightSettings(false, 0))
     private val ack = """{"accepted":true,"requestId":"test-request","zone":"balcony","deviceSession":"test-boot","revision":1}"""
