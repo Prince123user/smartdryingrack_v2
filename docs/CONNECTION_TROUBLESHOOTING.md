@@ -1,5 +1,11 @@
 # Rack unreachable from both phone browser and app
 
+## In-app connection controls
+
+Home's connection card opens the connection settings. The connection panel separates current status, address/actions, and an expandable device-details guide. It shows consecutive failed read attempts and labels retained readings stale. Wi-Fi absence, timeouts/refused connections, HTTP 404/503, and invalid telemetry have different recovery messages; HTTP 503 establishes that the ESP32 responded, not that its sensors are healthy.
+
+Use **Retry now** to restart a requested read connection, **Open Wi-Fi settings** to join the rack's local network, or **Disconnect & pause retries** to stop reconnecting intentionally. Editing the address changes the action to **Save address & connect**; the saved address is not proof that the device responded. While connecting, duplicate connect actions are disabled and Disconnect remains available. Normal polling remains every two seconds; failed checks retry after a five-second pause, plus request duration. Neither action replays rack or lighting commands. Internet is not required for the local Wi-Fi transport. Each lighting/sensor service still validates its own responses.
+
 A timeout connecting to `192.168.1.92:80` means that address did not complete the TCP connection. It does **not** establish a bad lighting JSON response or missing lighting endpoint. If the phone browser also cannot open `/api/status`, first restore basic rack connectivity; an APK update cannot power the ESP32, repair wiring or find its changed DHCP address automatically.
 
 ## Restore the known working baseline

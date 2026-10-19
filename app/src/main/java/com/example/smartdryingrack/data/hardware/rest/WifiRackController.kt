@@ -35,6 +35,8 @@ class WifiRackController internal constructor(
     private val connection = MutableStateFlow(ConnectionState.OFFLINE)
     private val _message = MutableStateFlow<String?>(null)
     val message = _message.asStateFlow()
+    private val _failedAttempts = MutableStateFlow(0)
+    val failedAttempts = _failedAttempts.asStateFlow()
     private val _firmware = MutableStateFlow<String?>(null)
     val firmware = _firmware.asStateFlow()
     private val _deviceMode = MutableStateFlow<RackMode?>(null)
@@ -104,6 +106,7 @@ class WifiRackController internal constructor(
                         _rainRaw.value = snapshot.rainRaw
                         _motionReason.value = snapshot.motionReason
                         _message.value = null
+                        _failedAttempts.value = 0
                         connection.value = ConnectionState.ONLINE
                     }
                 } catch (e: Exception) {
@@ -111,7 +114,8 @@ class WifiRackController internal constructor(
                     if (session != generation) return@launch
                     state.value = RackState.UNKNOWN
                     connection.value = ConnectionState.ERROR
-                    _message.value = "Unable to read the rack. Check Wi-Fi, the address and firmware API."
+                    _failedAttempts.value += 1
+                    _message.value = connectionFailureMessage(e)
                 }
                 delay(if (connection.value == ConnectionState.ONLINE) 2000L else 5000L)
             }
@@ -131,6 +135,7 @@ class WifiRackController internal constructor(
         sensors.value = null
         _firmware.value = null
         _message.value = null
+        _failedAttempts.value = 0
         _deviceMode.value = null
         _stopLatched.value = null
         _buzzerEnabled.value = null

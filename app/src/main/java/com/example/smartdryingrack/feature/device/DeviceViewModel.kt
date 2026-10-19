@@ -23,6 +23,7 @@ class DeviceViewModel @Inject constructor(
     val address = preferences.address
     val firmware = controller.firmware
     val message = controller.message
+    val failedAttempts = controller.failedAttempts
     private val _validation = MutableStateFlow<String?>(null)
     val validation = _validation.asStateFlow()
     fun connect(address: String) {

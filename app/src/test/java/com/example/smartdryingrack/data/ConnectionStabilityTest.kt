@@ -21,6 +21,15 @@ import java.util.concurrent.TimeUnit
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE, sdk = [28])
 class ConnectionStabilityTest {
+    @Test fun connectionErrorsDistinguishWifiReachabilityServiceAndProtocolWithoutRawDetails() {
+        assertTrue(connectionFailureMessage(RackWifiUnavailableException()).contains("Wi-Fi is unavailable"))
+        assertTrue(connectionFailureMessage(java.net.SocketTimeoutException("private socket details")).contains("did not respond"))
+        assertTrue(connectionFailureMessage(RackHttpException(503)).contains("ESP32 responded"))
+        assertTrue(connectionFailureMessage(RackHttpException(404)).contains("endpoint was not found"))
+        val invalid = connectionFailureMessage(org.json.JSONException("untrusted response body"))
+        assertTrue(invalid.contains("incompatible status data"))
+        assertFalse(invalid.contains("untrusted"))
+    }
     private val status = """{"state":"RETRACTED","firmwareVersion":"1.2.0","sensors":{"temperature":29.5,"humidity":64,"rainDetected":false}}"""
 
     private class Fixture(val server: MockWebServer, val controller: WifiRackController) : AutoCloseable {
@@ -51,12 +60,16 @@ class ConnectionStabilityTest {
                 f.server.enqueue(MockResponse().setResponseCode(503))
                 advanceTimeBy(2000); runCurrent()
                 assertEquals(ConnectionState.ERROR, f.controller.observeConnection().value)
+                assertEquals(1, f.controller.failedAttempts.value)
+                assertTrue(f.controller.message.value!!.contains("ESP32 responded"))
                 assertEquals(RackState.UNKNOWN, f.controller.observeRackState().value)
                 // Retained readings are historical; connection state must not stay online.
                 assertNotNull(f.controller.observeSensorData().value)
                 f.server.enqueue(MockResponse().setBody(status))
                 advanceTimeBy(5000); runCurrent()
                 assertEquals(ConnectionState.ONLINE, f.controller.observeConnection().value)
+                assertEquals(0, f.controller.failedAttempts.value)
+                assertNull(f.controller.message.value)
                 assertEquals(RackState.RETRACTED, f.controller.observeRackState().value)
             }
             assertEquals(41, f.server.requestCount)

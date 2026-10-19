@@ -47,7 +47,7 @@ class NavigationRenderTest {
     }
 
     @Test fun appLaunchesAndEveryPrimaryNavigationRenders() {
-        compose.onNodeWithText("Connect your ESP32 rack").assertExists()
+        compose.onNodeWithText("Set up your rack’s Wi-Fi connection").assertExists()
         compose.onNodeWithContentDescription("Illustration of a motorized drying rack with hanging laundry").assertExists()
         capture("01-home")
         compose.onNodeWithText("Control").performClick()
@@ -65,7 +65,7 @@ class NavigationRenderTest {
         compose.onNodeWithText("No notifications yet").assertExists()
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithContentDescription("Home").assertHasClickAction().performClick()
-        compose.onNodeWithText("Connect your ESP32 rack").assertExists()
+        compose.onNodeWithText("Set up your rack’s Wi-Fi connection").assertExists()
         compose.onNodeWithContentDescription("Notifications").performClick()
         capture("05-notifications", "Notifications")
         compose.onNodeWithContentDescription("Back").performClick()
@@ -76,7 +76,7 @@ class NavigationRenderTest {
         compose.onNodeWithText("Midnight cyan").assertExists()
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNode(hasText("Device Settings") and hasClickAction()).performScrollTo().performClick()
-        compose.onNodeWithText("Your rack").assertExists()
+        compose.onNodeWithText("Rack connection").assertExists()
         capture("14-device-settings", "Device Settings")
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNode(hasText("Notification Settings") and hasClickAction()).performScrollTo().performClick()
@@ -108,7 +108,7 @@ class NavigationRenderTest {
         capture("13-connect-device", "Connect Device")
         compose.onNodeWithText("Explore offline").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Home").assertIsSelected()
-        compose.onNodeWithText("Connect your ESP32 rack").assertExists()
+        compose.onNodeWithText("Set up your rack’s Wi-Fi connection").assertExists()
     }
 
     @Test fun tabsAndSettingsLoopRepeatedlyFromHome() {
@@ -116,7 +116,7 @@ class NavigationRenderTest {
         fun assertTab(label: String) {
             tab(label).assertIsSelected()
             when (label) {
-                "Home" -> compose.onNodeWithText("Connect your ESP32 rack").assertExists()
+                "Home" -> compose.onNodeWithText("Set up your rack’s Wi-Fi connection").assertExists()
                 "Control" -> compose.onNodeWithText("Extend").assertExists()
                 "Alerts" -> compose.onNodeWithText("No new alerts").assertExists()
                 "History" -> compose.onNodeWithText("Waiting for temperature history").assertExists()
@@ -276,7 +276,7 @@ class NavigationRenderTest {
                 compose.onNode(hasText("House Lights") and hasClickAction()).performScrollTo().performClick()
                 compose.onNodeWithText("Six independent dimmable LEDs").assertExists()
                 compose.onNodeWithText("Connection settings").performScrollTo().performClick()
-                compose.onNodeWithText("Your rack").assertExists()
+                compose.onNodeWithText("Rack connection").assertExists()
                 compose.onNodeWithContentDescription("Back").performClick()
                 compose.onNodeWithText("Six independent dimmable LEDs").assertExists()
                 compose.onNodeWithContentDescription("Front power").assertIsNotEnabled()
@@ -287,7 +287,7 @@ class NavigationRenderTest {
                 compose.onNodeWithText("Waiting for temperature history").assertExists()
                 compose.onNodeWithContentDescription("Settings").performClick()
                 tab("History").performClick(); tab("Home").performClick()
-                compose.onNodeWithText("Connect your ESP32 rack").assertExists()
+                compose.onNodeWithText("Set up your rack’s Wi-Fi connection").assertExists()
             }
         }
     }

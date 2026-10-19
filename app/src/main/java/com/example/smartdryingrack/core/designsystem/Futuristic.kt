@@ -68,10 +68,10 @@ fun DeviceConnectionCard(connection: ConnectionState, onClick: () -> Unit) {
             Column(Modifier.weight(1f).padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(stringResource(connection.labelRes()), fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
                 Text(when (connection) {
-                    ConnectionState.ONLINE -> "Your rack is online"
+                    ConnectionState.ONLINE -> "Receiving readings · connection details"
                     ConnectionState.CONNECTING -> "Checking device telemetry…"
-                    ConnectionState.ERROR -> "Check Wi-Fi and device address"
-                    ConnectionState.OFFLINE -> "Connect your ESP32 rack"
+                    ConnectionState.ERROR -> "Connection needs attention · tap for help"
+                    ConnectionState.OFFLINE -> "Set up your rack’s Wi-Fi connection"
                 }, style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
             }
             Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = accent)
