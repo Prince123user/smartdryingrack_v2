@@ -42,6 +42,7 @@ data class ControlUiState(
     val buzzerEnabled: Boolean? = null,
     val buzzerUpdating: Boolean = false,
     val buzzerAutoRequired: Boolean? = null,
+    val buzzerAvailable: Boolean? = null,
     val deviceMessage: String? = null,
     val rainRaw: Int? = null,
     val motionReason: String? = null,
@@ -85,11 +86,11 @@ class ControlViewModel @Inject constructor(
 
     private val buzzerUpdating = MutableStateFlow(false)
     private val deviceMessage = MutableStateFlow<String?>(null)
-    private data class DeviceControls(val buzzer: Boolean?, val updating: Boolean, val message: String?, val raw: Int?, val reason: String?, val autoRequired: Boolean?)
+    private data class DeviceControls(val buzzer: Boolean?, val updating: Boolean, val message: String?, val raw: Int?, val reason: String?, val autoRequired: Boolean?, val available: Boolean?)
     private val settingsMessage = combine(deviceMessage, rack.modeMessage, controller.message) { local, mode, connection -> connection ?: mode ?: local }
-    private val buzzerPolicy = combine(controller.buzzerEnabled, controller.buzzerAutoRequired) { enabled, auto -> enabled to auto }
+    private val buzzerPolicy = combine(controller.buzzerEnabled, controller.buzzerAutoRequired, controller.buzzerAvailable) { enabled, auto, available -> Triple(enabled, auto, available) }
     private val deviceControls = combine(buzzerPolicy, buzzerUpdating, settingsMessage, controller.rainRaw, controller.motionReason) { buzzer, updating, message, raw, reason ->
-        DeviceControls(buzzer.first, updating, message, raw, reason, buzzer.second)
+        DeviceControls(buzzer.first, updating, message, raw, reason, buzzer.second, buzzer.third)
     }
     private val controls =
         combine(base, schedules.schedule, settings.settings, rejection, rack.pendingMovement) { b, sch, set, rej, pending ->
@@ -99,7 +100,7 @@ class ControlViewModel @Inject constructor(
                     retract = com.example.smartdryingrack.domain.model.Unavailable.MOVING))
         }
     val uiState: StateFlow<ControlUiState> = combine(controls, deviceControls) { state, device ->
-        state.copy(buzzerEnabled = device.buzzer, buzzerAutoRequired = device.autoRequired, buzzerUpdating = device.updating, deviceMessage = device.message,
+        state.copy(buzzerEnabled = device.buzzer, buzzerAutoRequired = device.autoRequired, buzzerAvailable = device.available, buzzerUpdating = device.updating, deviceMessage = device.message,
             rainRaw = device.raw, motionReason = device.reason)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ControlUiState())
 
@@ -111,7 +112,7 @@ class ControlViewModel @Inject constructor(
             try { controller.setBuzzer(enabled) }
             catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                deviceMessage.value = "Buzzer setting not confirmed. " + com.example.smartdryingrack.data.hardware.rest.connectionFailureMessage(e)
+                deviceMessage.value = if (e is com.example.smartdryingrack.data.hardware.rest.RackHttpException && e.statusCode == 503) "Buzzer output unavailable. Check device diagnostics before retrying." else "Buzzer setting not confirmed. " + com.example.smartdryingrack.data.hardware.rest.connectionFailureMessage(e)
             } finally { buzzerUpdating.value = false }
         }
     }

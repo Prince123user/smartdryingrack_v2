@@ -91,7 +91,8 @@ inline bool ledcAttachChannel(int pin,int frequency,int bits,int channel) {
   (void)frequency;(void)bits; pwmChannels[pin]=channel;return pin!=failedPwmPin;
 }
 inline bool ledcWrite(int pin,int duty){if(pin==failedPwmPin)return false;pwmDuty[pin]=duty;return true;}
-inline double ledcWriteTone(int pin,int hz){pwmDuty[pin]=hz;if(hz)tones++;else stops++;return hz;}
+inline bool failedToneOutput=false;
+inline double ledcWriteTone(int pin,int hz){if(failedToneOutput && hz>0)return 0;pwmDuty[pin]=hz;if(hz)tones++;else stops++;return hz;}
 inline uint32_t esp_random(){static uint32_t v=100;return ++v;}
 
 inline uint32_t ledcRead(int pin){return pwmDuty[pin];}

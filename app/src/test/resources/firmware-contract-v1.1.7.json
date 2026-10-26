@@ -1,0 +1,413 @@
+{
+  "autoConfig": {
+    "mode": "AUTO",
+    "rainProtectionEnabled": true,
+    "buzzerEnabled": false,
+    "buzzerAutoRequired": true,
+    "buzzerEffectiveEnabled": true,
+    "buzzerAvailable": true,
+    "buzzerToneFault": false,
+    "buzzerOnMovement": true,
+    "rainThreshold": 1900
+  },
+  "autoMutedPreferenceStatus": {
+    "state": "RETRACTED",
+    "firmwareVersion": "1.1.7",
+    "sensors": {
+      "temperature": 29,
+      "humidity": 70,
+      "rainDetected": false,
+      "clothesDryPercentage": null,
+      "rainRaw": 0
+    },
+    "positionSource": "COMMAND_ESTIMATE",
+    "positionMeasured": false,
+    "mode": "AUTO",
+    "rainProtectionEnabled": true,
+    "rainRaw": 0,
+    "dhtSampleAgeMs": 0,
+    "buzzerAvailable": true,
+    "buzzerToneFault": false,
+    "buzzerEnabled": false,
+    "buzzerAutoRequired": true,
+    "buzzerEffectiveEnabled": true,
+    "stopLatched": false
+  },
+  "manualConfig": {
+    "mode": "MANUAL",
+    "rainProtectionEnabled": true,
+    "buzzerEnabled": false,
+    "buzzerAutoRequired": true,
+    "buzzerEffectiveEnabled": false,
+    "buzzerAvailable": true,
+    "buzzerToneFault": false,
+    "buzzerOnMovement": true,
+    "rainThreshold": 1900
+  },
+  "manualMutedStatus": {
+    "state": "RETRACTED",
+    "firmwareVersion": "1.1.7",
+    "sensors": {
+      "temperature": 29,
+      "humidity": 70,
+      "rainDetected": false,
+      "clothesDryPercentage": null,
+      "rainRaw": 0
+    },
+    "positionSource": "COMMAND_ESTIMATE",
+    "positionMeasured": false,
+    "mode": "MANUAL",
+    "rainProtectionEnabled": true,
+    "rainRaw": 0,
+    "dhtSampleAgeMs": 0,
+    "buzzerAvailable": true,
+    "buzzerToneFault": false,
+    "buzzerEnabled": false,
+    "buzzerAutoRequired": true,
+    "buzzerEffectiveEnabled": false,
+    "stopLatched": false
+  },
+  "buzzerEnableAck": {
+    "accepted": true,
+    "buzzerEnabled": true
+  },
+  "manualEnabledStatus": {
+    "state": "RETRACTED",
+    "firmwareVersion": "1.1.7",
+    "sensors": {
+      "temperature": 29,
+      "humidity": 70,
+      "rainDetected": false,
+      "clothesDryPercentage": null,
+      "rainRaw": 0
+    },
+    "positionSource": "COMMAND_ESTIMATE",
+    "positionMeasured": false,
+    "mode": "MANUAL",
+    "rainProtectionEnabled": true,
+    "rainRaw": 0,
+    "dhtSampleAgeMs": 0,
+    "buzzerAvailable": true,
+    "buzzerToneFault": false,
+    "buzzerEnabled": true,
+    "buzzerAutoRequired": true,
+    "buzzerEffectiveEnabled": true,
+    "stopLatched": false
+  },
+  "movementAck": {
+    "accepted": true
+  },
+  "lightsBefore": {
+    "firmwareVersion": "1.1.7",
+    "settingsPersist": false,
+    "schemaVersion": 2,
+    "deviceSession": "00000068000000670000006600000065",
+    "stateVersion": 1,
+    "zones": [
+      {
+        "id": "front",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "revision": 0,
+        "lastRequestId": null
+      },
+      {
+        "id": "left",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "revision": 0,
+        "lastRequestId": null
+      },
+      {
+        "id": "right",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "revision": 0,
+        "lastRequestId": null
+      },
+      {
+        "id": "back",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "revision": 0,
+        "lastRequestId": null
+      },
+      {
+        "id": "cr",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "revision": 0,
+        "lastRequestId": null
+      },
+      {
+        "id": "balcony",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "revision": 0,
+        "lastRequestId": null
+      }
+    ],
+    "indicator": {
+      "id": "system_status",
+      "mode": "AUTOMATIC",
+      "power": true,
+      "brightness": 100,
+      "rgb": {
+        "r": 0,
+        "g": 255,
+        "b": 255
+      },
+      "meaning": "RACK_MOVING",
+      "description": "RACK_MOVING",
+      "pattern": "solid"
+    },
+    "lights": [
+      {
+        "id": "front",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "type": "SINGLE_COLOR",
+        "gpio": 23,
+        "activeLow": true,
+        "pwmDutyReadback": 255,
+        "pwmFrequencyHz": 1000,
+        "outputDuty": 255
+      },
+      {
+        "id": "left",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "type": "SINGLE_COLOR",
+        "gpio": 22,
+        "activeLow": true,
+        "pwmDutyReadback": 255,
+        "pwmFrequencyHz": 1000,
+        "outputDuty": 255
+      },
+      {
+        "id": "right",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "type": "SINGLE_COLOR",
+        "gpio": 21,
+        "activeLow": true,
+        "pwmDutyReadback": 255,
+        "pwmFrequencyHz": 1000,
+        "outputDuty": 255
+      },
+      {
+        "id": "back",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "type": "SINGLE_COLOR",
+        "gpio": 17,
+        "activeLow": true,
+        "pwmDutyReadback": 255,
+        "pwmFrequencyHz": 1000,
+        "outputDuty": 255
+      },
+      {
+        "id": "cr",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "type": "SINGLE_COLOR",
+        "gpio": 16,
+        "activeLow": true,
+        "pwmDutyReadback": 255,
+        "pwmFrequencyHz": 1000,
+        "outputDuty": 255
+      },
+      {
+        "id": "balcony",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "type": "SINGLE_COLOR",
+        "gpio": 25,
+        "activeLow": true,
+        "pwmDutyReadback": 255,
+        "pwmFrequencyHz": 1000,
+        "outputDuty": 255
+      }
+    ],
+    "statusIndicator": {
+      "automatic": true,
+      "hardwareEnabled": true,
+      "reason": "RACK_MOVING",
+      "r": 0,
+      "g": 255,
+      "b": 255
+    }
+  },
+  "lightAck": {
+    "accepted": true,
+    "requestId": "contract-front",
+    "zone": "front",
+    "deviceSession": "00000068000000670000006600000065",
+    "revision": 2
+  },
+  "lightsAfter": {
+    "firmwareVersion": "1.1.7",
+    "settingsPersist": false,
+    "schemaVersion": 2,
+    "deviceSession": "00000068000000670000006600000065",
+    "stateVersion": 2,
+    "zones": [
+      {
+        "id": "front",
+        "power": true,
+        "brightness": 25,
+        "available": true,
+        "revision": 2,
+        "lastRequestId": "contract-front"
+      },
+      {
+        "id": "left",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "revision": 0,
+        "lastRequestId": null
+      },
+      {
+        "id": "right",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "revision": 0,
+        "lastRequestId": null
+      },
+      {
+        "id": "back",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "revision": 0,
+        "lastRequestId": null
+      },
+      {
+        "id": "cr",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "revision": 0,
+        "lastRequestId": null
+      },
+      {
+        "id": "balcony",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "revision": 0,
+        "lastRequestId": null
+      }
+    ],
+    "indicator": {
+      "id": "system_status",
+      "mode": "AUTOMATIC",
+      "power": true,
+      "brightness": 100,
+      "rgb": {
+        "r": 0,
+        "g": 255,
+        "b": 255
+      },
+      "meaning": "RACK_MOVING",
+      "description": "RACK_MOVING",
+      "pattern": "solid"
+    },
+    "lights": [
+      {
+        "id": "front",
+        "power": true,
+        "brightness": 25,
+        "available": true,
+        "type": "SINGLE_COLOR",
+        "gpio": 23,
+        "activeLow": true,
+        "pwmDutyReadback": 191,
+        "pwmFrequencyHz": 1000,
+        "outputDuty": 191
+      },
+      {
+        "id": "left",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "type": "SINGLE_COLOR",
+        "gpio": 22,
+        "activeLow": true,
+        "pwmDutyReadback": 255,
+        "pwmFrequencyHz": 1000,
+        "outputDuty": 255
+      },
+      {
+        "id": "right",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "type": "SINGLE_COLOR",
+        "gpio": 21,
+        "activeLow": true,
+        "pwmDutyReadback": 255,
+        "pwmFrequencyHz": 1000,
+        "outputDuty": 255
+      },
+      {
+        "id": "back",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "type": "SINGLE_COLOR",
+        "gpio": 17,
+        "activeLow": true,
+        "pwmDutyReadback": 255,
+        "pwmFrequencyHz": 1000,
+        "outputDuty": 255
+      },
+      {
+        "id": "cr",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "type": "SINGLE_COLOR",
+        "gpio": 16,
+        "activeLow": true,
+        "pwmDutyReadback": 255,
+        "pwmFrequencyHz": 1000,
+        "outputDuty": 255
+      },
+      {
+        "id": "balcony",
+        "power": false,
+        "brightness": 100,
+        "available": true,
+        "type": "SINGLE_COLOR",
+        "gpio": 25,
+        "activeLow": true,
+        "pwmDutyReadback": 255,
+        "pwmFrequencyHz": 1000,
+        "outputDuty": 255
+      }
+    ],
+    "statusIndicator": {
+      "automatic": true,
+      "hardwareEnabled": true,
+      "reason": "RACK_MOVING",
+      "r": 0,
+      "g": 255,
+      "b": 255
+    }
+  }
+}

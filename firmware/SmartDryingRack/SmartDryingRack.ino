@@ -1,4 +1,5 @@
-/* Release 1.1.6: AUTO always permits movement sound; MANUAL uses buzzerEnabled.
+/* Release 1.1.7: detect failed buzzer tone generation and reject false-success ACKs.
+ * AUTO requires sound; MANUAL retains its optional sound preference.
  * Common-cathode RGB remains enabled on R26/G32/B33 with one resistor/color.
  * Retains schema 2, per-zone guarded writes, boot sessions, revisions,
  * buzzerEnabled, nested rainRaw, latched STOP and stable-dry AUTO behavior.
@@ -15,7 +16,7 @@
  * LIGHTING ADDITION 1.1.0 - Read before wiring
  * This is the complete uploaded working 1.0.2 sketch plus lighting additions.
  * Six ordinary single-color LEDs: front D23, left D22, right D21, back D17,
- * CR D16, balcony D25. Input polarity is configurable; release 1.1.6 defaults to active-low.
+ * CR D16, balcony D25. Input polarity is configurable; release 1.1.7 defaults to active-low.
  * Never connect an unresisted LED or a 5 V LED load directly to GPIO.
  * Use individually sized current limiting and a suitably rated driver/supply.
  * All driver/supply grounds join ESP32 GND. Servo keeps its external supply.
@@ -160,7 +161,7 @@ constexpr unsigned long DHT_MAX_AGE_MS = 6000;
 // Classic ESP32 WROOM-32 only: buzzer uses LEDC channel 14 (low-speed timer 3).
 // ESP32Servo is restricted to timer 0 below to keep its 50 Hz PWM separate.
 constexpr uint8_t BUZZER_LEDC_CHANNEL = 14;
-constexpr char FIRMWARE_VERSION[] = "1.1.6";
+constexpr char FIRMWARE_VERSION[] = "1.1.7";
 
 // Six SINGLE-COLOR house LEDs, with configured output/driver polarity.
 // GPIO -> driver input, NOT an unrestricted 5 V LED load. Use LED current limiting.
@@ -249,6 +250,7 @@ bool previousRainConfirmed = false;
 bool dryTimerRunning = false;
 unsigned long dryStartedAt = 0;
 bool buzzerAvailable = false;
+bool buzzerToneFault = false;
 bool buzzerActive = false;
 bool buzzerOnPhase = false;
 uint8_t buzzerPulsesRemaining = 0;
@@ -350,6 +352,18 @@ void stopBuzzer() {
   buzzerPriority = 0;
 }
 
+// A nonzero requested frequency must produce a nonzero timer frequency.
+// This validates peripheral configuration, not audible sound or load current.
+bool writeBuzzerTone(uint16_t frequency) {
+  if (ledcWriteTone(BUZZER_PIN, frequency) > 0) return true;
+  ledcWrite(BUZZER_PIN, 0);
+  buzzerToneFault = true;
+  stopBuzzer();
+  buzzerAvailable = false; // Latched until reboot/reinitialization.
+  Serial.println("Buzzer tone output failed; PWM marked unavailable");
+  return false;
+}
+
 void startBuzzerPattern(uint16_t frequency, uint16_t onMs, uint16_t offMs,
                        uint8_t count, uint8_t priority) {
   if (!buzzerSoundEnabled() || !buzzerAvailable || count == 0) return;
@@ -362,7 +376,7 @@ void startBuzzerPattern(uint16_t frequency, uint16_t onMs, uint16_t offMs,
   buzzerPhaseAt = millis();
   buzzerActive = true;
   buzzerOnPhase = true;
-  ledcWriteTone(BUZZER_PIN, buzzerFrequency);
+  writeBuzzerTone(buzzerFrequency);
 }
 
 void beep(uint16_t frequency, uint16_t duration) {
@@ -379,9 +393,10 @@ void updateBuzzer() {
     buzzerPhaseAt = millis();
     if (--buzzerPulsesRemaining == 0) stopBuzzer();
   } else if (!buzzerOnPhase && elapsed >= buzzerOffMs) {
-    ledcWriteTone(BUZZER_PIN, buzzerFrequency);
-    buzzerOnPhase = true;
-    buzzerPhaseAt = millis();
+    if (writeBuzzerTone(buzzerFrequency)) {
+      buzzerOnPhase = true;
+      buzzerPhaseAt = millis();
+    }
   }
 }
 
@@ -645,6 +660,7 @@ void handleStatus() {
   body += ",\"rainRaw\":" + String(lastRainRaw);
   body += ",\"dhtSampleAgeMs\":" + String(millis() - lastDhtSuccessAt);
   body += ",\"buzzerAvailable\":" + String(buzzerAvailable ? "true" : "false");
+  body += ",\"buzzerToneFault\":" + String(buzzerToneFault ? "true" : "false");
   body += ",\"buzzerEnabled\":" + String(BUZZER_ENABLED ? "true" : "false");
   body += ",\"buzzerAutoRequired\":true";
   body += ",\"buzzerEffectiveEnabled\":" + String(buzzerSoundEnabled() ? "true" : "false");
@@ -716,6 +732,8 @@ void handleGetConfig() {
   doc["buzzerEnabled"] = BUZZER_ENABLED; // Retained MANUAL preference, not the AUTO override.
   doc["buzzerAutoRequired"] = true;
   doc["buzzerEffectiveEnabled"] = buzzerSoundEnabled();
+  doc["buzzerAvailable"] = buzzerAvailable;
+  doc["buzzerToneFault"] = buzzerToneFault;
   doc["buzzerOnMovement"] = BUZZER_ON_MOVEMENT;
   doc["rainThreshold"] = RAIN_THRESHOLD;
   String body;
@@ -790,10 +808,11 @@ void handleDiagnostics() {
     doc["rawHumidityRH"] = nullptr;
     doc["sampleAgeMs"] = nullptr;
   }
-  doc["buzzerAvailable"] = buzzerAvailable;
   doc["buzzerEnabled"] = BUZZER_ENABLED; // Retained MANUAL preference, not the AUTO override.
   doc["buzzerAutoRequired"] = true;
   doc["buzzerEffectiveEnabled"] = buzzerSoundEnabled();
+  doc["buzzerAvailable"] = buzzerAvailable;
+  doc["buzzerToneFault"] = buzzerToneFault;
   doc["dryTimerRunning"] = dryTimerRunning;
   doc["dryDelayMs"] = AUTO_EXTEND_DRY_DELAY_MS;
   String body;
@@ -802,7 +821,8 @@ void handleDiagnostics() {
 }
 
 void handleBuzzerTest() {
-  if (!buzzerAvailable || !buzzerSoundEnabled()) {
+  if (!buzzerAvailable) { sendError(503, "BUZZER_UNAVAILABLE", "Buzzer PWM output unavailable"); return; }
+  if (!buzzerSoundEnabled()) {
     sendError(409, "BUZZER_UNAVAILABLE", "Check buzzer initialization and enabled setting");
     return;
   }
@@ -811,6 +831,7 @@ void handleBuzzerTest() {
     return;
   }
   startBuzzerPattern(2400, 400, 250, 3, 2);
+  if (buzzerToneFault) { sendError(503, "BUZZER_TONE_FAILED", "Tone output failed; inspect diagnostics"); return; }
   sendJson(200, statusJson(true));
 }
 
@@ -1123,9 +1144,14 @@ void handleAppBuzzer() {
     if (previous->action != action) { sendError(409, "REQUEST_ID_REUSE", "Request ID already used"); return; }
     sendJson(previous->httpStatus, previous->response); return;
   }
+  const bool previousPreference = BUZZER_ENABLED;
   BUZZER_ENABLED = enabled;
   if (!buzzerSoundEnabled()) stopBuzzer();
   else if (enabled) startBuzzerPattern(2400, 150, 100, 1, 1);
+  if (buzzerToneFault) {
+    BUZZER_ENABLED = previousPreference;
+    sendError(503, "BUZZER_TONE_FAILED", "Tone output failed; preference not confirmed"); return;
+  }
   String response = "{\"accepted\":true,\"buzzerEnabled\":" + String(enabled ? "true" : "false") + "}";
   cacheResponse(key, action, response, 200);
   sendJson(200, response);
@@ -1192,7 +1218,7 @@ void setup() {
   server.on("/api/buzzer", HTTP_OPTIONS, handleOptions);
   server.onNotFound(handleNotFound);
   server.begin();
-  Serial.println("SMART RACK 1.1.6 - APP COMPATIBLE LIGHTS AND STATUS FIXES");
+  Serial.println("SMART RACK 1.1.7 - APP COMPATIBLE LIGHTS AND STATUS FIXES");
   Serial.println("Smart Drying Rack API started; waiting for Wi-Fi");
   if (STATUS_RGB_ENABLED) Serial.println("RGB status enabled: common cathode/GND, R26 G32 B33, one resistor per color");
   else Serial.println("RGB status physical output disabled");

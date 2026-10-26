@@ -120,15 +120,16 @@ fun ControlScreen(state: ControlUiState, actions: ControlActions, onHouseLights:
         }
         com.example.smartdryingrack.core.designsystem.NeonToggleRow("Buzzer", when {
             !online -> "Connection unavailable · reconnect to confirm sound setting"
+            state.buzzerAvailable == false -> "Buzzer output unavailable · check device diagnostics"
             state.mode == com.example.smartdryingrack.domain.model.RackMode.AUTO && state.buzzerAutoRequired == true -> "AUTO · movement sound always on. Switch to MANUAL to choose sound."
             state.mode == com.example.smartdryingrack.domain.model.RackMode.AUTO -> "Update firmware to 1.1.6+ for mandatory AUTO movement sound."
             state.buzzerUpdating -> "Waiting for device confirmation…"
             state.buzzerEnabled == null -> "Requires updated ESP32 firmware (1.1.0+)"
             state.buzzerEnabled -> "Sound enabled · toggle on to test a short beep"
             else -> "Sound disabled"
-        }, Icons.Outlined.VolumeUp, checked = if (state.mode == com.example.smartdryingrack.domain.model.RackMode.AUTO && state.buzzerAutoRequired == true) true else state.buzzerEnabled == true,
+        }, Icons.Outlined.VolumeUp, checked = if (state.buzzerAvailable == false) false else if (state.mode == com.example.smartdryingrack.domain.model.RackMode.AUTO && state.buzzerAutoRequired == true) true else state.buzzerEnabled == true,
             onChange = actions::setBuzzerEnabled,
-            enabled = state.mode == com.example.smartdryingrack.domain.model.RackMode.MANUAL && state.connection == com.example.smartdryingrack.domain.model.ConnectionState.ONLINE && state.buzzerEnabled != null && !state.buzzerUpdating)
+            enabled = state.mode == com.example.smartdryingrack.domain.model.RackMode.MANUAL && state.connection == com.example.smartdryingrack.domain.model.ConnectionState.ONLINE && state.buzzerEnabled != null && state.buzzerAvailable != false && !state.buzzerUpdating)
         state.deviceMessage?.let { Text(it, color = AppColors.Warning, style = MaterialTheme.typography.bodySmall) }
         state.rainRaw?.let { Text("${if (online) "Rain sensor raw" else "Last rain sensor raw (stale)"}: $it · check dry/wet calibration",
             style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary) }

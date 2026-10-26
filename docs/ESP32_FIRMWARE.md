@@ -126,3 +126,7 @@ Every accepted movement start requests a short beep: retract 1800 Hz / 350 ms, e
 The matching app locks the switch ON in AUTO only when this capability is device-reported. In MANUAL it displays the retained preference and enables the existing acknowledged toggle. Older firmware gets an update message instead of a claimed automatic override. Update both firmware and app for the complete experience.
 
 Validation: simulated extend/retract with both modes and both preferences, mode transitions, legacy movement-flag override, STOP, API policy parsing, and AUTO switch lockout. Physical sound and the unidentified two-pin buzzer's drive requirements remain unverified. Keep resistorless house LEDs disconnected until suitable per-LED resistors are fitted.
+
+## Release 1.1.7 — compatibility verification and tone failure reporting
+
+Positive-frequency buzzer writes are checked. A failed write attempts to mute GPIO19, marks PWM unavailable, latches `buzzerToneFault`, and stops the pattern. The buzzer test/enable endpoint returns HTTP 503 for detected tone failure; a failed enable restores the previous manual preference. The app displays unavailable output instead of a working sound switch. Reboot/reinitialization is required after a latched tone fault. AUTO/MANUAL policy, RGB and other rack controls are retained. See `COMPATIBILITY_CHECK_1.1.7.md` for measured software results and remaining physical checks.
