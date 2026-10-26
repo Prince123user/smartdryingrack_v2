@@ -2,13 +2,15 @@ package com.example.smartdryingrack.feature.control
 
 import android.text.format.DateFormat
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.*
 import com.example.smartdryingrack.core.designsystem.MovementAction
-import com.example.smartdryingrack.core.designsystem.ScreenHeading
+import com.example.smartdryingrack.core.designsystem.NeonFeatureRow
+import com.example.smartdryingrack.core.designsystem.NeonToggleRow
+import com.example.smartdryingrack.core.designsystem.RackHero
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
@@ -16,7 +18,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -48,13 +49,12 @@ import com.example.smartdryingrack.core.designsystem.FuturisticToggle
 import com.example.smartdryingrack.core.designsystem.GlassCard
 import com.example.smartdryingrack.core.designsystem.ModeSelector
 import com.example.smartdryingrack.core.designsystem.RackControlButton
-import com.example.smartdryingrack.core.designsystem.RackStatusCard
 import com.example.smartdryingrack.core.designsystem.ScreenColumn
-import com.example.smartdryingrack.core.designsystem.labelRes
-import com.example.smartdryingrack.domain.model.CommandSource
 import com.example.smartdryingrack.domain.model.RackAction
+import com.example.smartdryingrack.domain.model.ConnectionState
+import com.example.smartdryingrack.domain.model.RackMode
+import com.example.smartdryingrack.domain.model.RackState
 import com.example.smartdryingrack.domain.model.RejectReason
-import com.example.smartdryingrack.domain.model.Unavailable
 import java.time.DayOfWeek
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -69,16 +69,6 @@ fun ControlRoute(onHouseLights: () -> Unit = {}, onConnectionSettings: () -> Uni
 }
 
 @StringRes
-private fun Unavailable.res(): Int = when (this) {
-    Unavailable.OFFLINE -> R.string.unavailable_offline
-    Unavailable.AUTO_MODE -> R.string.unavailable_auto
-    Unavailable.ALREADY_EXTENDED -> R.string.unavailable_extended
-    Unavailable.ALREADY_RETRACTED -> R.string.unavailable_retracted
-    Unavailable.MOVING -> R.string.unavailable_moving
-    Unavailable.UNSAFE -> R.string.reject_error
-}
-
-@StringRes
 private fun RejectReason.res(): Int = when (this) {
     RejectReason.OFFLINE -> R.string.reject_offline
     RejectReason.ALREADY_THERE -> R.string.reject_already
@@ -88,13 +78,12 @@ private fun RejectReason.res(): Int = when (this) {
     RejectReason.NOT_A_COMMAND -> R.string.reject_none
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ControlScreen(state: ControlUiState, actions: ControlActions, onHouseLights: () -> Unit = {}, onConnectionSettings: () -> Unit = {}) {
-    val online = state.connection == com.example.smartdryingrack.domain.model.ConnectionState.ONLINE
+    val online = state.connection == ConnectionState.ONLINE
     ScreenColumn {
         ModeSelector(state.mode, actions::setMode, Modifier.fillMaxWidth())
-        com.example.smartdryingrack.core.designsystem.NeonFeatureRow("House Lights", "Control six independent dimmable LEDs", Icons.Outlined.Lightbulb, onHouseLights)
+        NeonFeatureRow("House Lights", "Control six independent dimmable LEDs", Icons.Outlined.Lightbulb, onHouseLights)
 
         if (!online) {
             GlassCard(Modifier.fillMaxWidth(), AppColors.Warning) {
@@ -105,11 +94,11 @@ fun ControlScreen(state: ControlUiState, actions: ControlActions, onHouseLights:
                 TextButton(onClick = onConnectionSettings) { Text("Connection settings") }
             }
         }
-        com.example.smartdryingrack.core.designsystem.RackHero(if (online) state.rackState else com.example.smartdryingrack.domain.model.RackState.UNKNOWN)
+        RackHero(if (online) state.rackState else RackState.UNKNOWN)
         if (online && state.pendingMovement != null) {
             Text("Movement accepted. Waiting for updated device state.", color = AppColors.Primary)
-        } else if (state.rackState in setOf(com.example.smartdryingrack.domain.model.RackState.UNKNOWN, com.example.smartdryingrack.domain.model.RackState.ERROR)) {
-            if (online) Text("Position is unknown or faulted. Inspect your rack and reconnect before moving it.", color = AppColors.Warning)
+        } else if (online && state.rackState in setOf(RackState.UNKNOWN, RackState.ERROR)) {
+            Text("Position is unknown or faulted. Inspect your rack and reconnect before moving it.", color = AppColors.Warning)
         }
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -118,18 +107,19 @@ fun ControlScreen(state: ControlUiState, actions: ControlActions, onHouseLights:
             MovementAction("Retract", Icons.Outlined.KeyboardDoubleArrowDown,
                 state.availability.retract == null, { actions.send(RackAction.RETRACT) }, Modifier.weight(1f))
         }
-        com.example.smartdryingrack.core.designsystem.NeonToggleRow("Buzzer", when {
+        NeonToggleRow("Buzzer", when {
             !online -> "Connection unavailable · reconnect to confirm sound setting"
             state.buzzerAvailable == false -> "Buzzer output unavailable · check device diagnostics"
-            state.mode == com.example.smartdryingrack.domain.model.RackMode.AUTO && state.buzzerAutoRequired == true -> "AUTO · movement sound always on. Switch to MANUAL to choose sound."
-            state.mode == com.example.smartdryingrack.domain.model.RackMode.AUTO -> "Update firmware to 1.1.6+ for mandatory AUTO movement sound."
+            state.mode == RackMode.AUTO && state.buzzerAutoRequired == true -> "AUTO · movement sound always on. Switch to MANUAL to choose sound."
+            state.mode == RackMode.AUTO -> "Update firmware to 1.1.6+ for mandatory AUTO movement sound."
             state.buzzerUpdating -> "Waiting for device confirmation…"
             state.buzzerEnabled == null -> "Requires updated ESP32 firmware (1.1.0+)"
             state.buzzerEnabled -> "Sound enabled · toggle on to test a short beep"
             else -> "Sound disabled"
-        }, Icons.Outlined.VolumeUp, checked = if (state.buzzerAvailable == false) false else if (state.mode == com.example.smartdryingrack.domain.model.RackMode.AUTO && state.buzzerAutoRequired == true) true else state.buzzerEnabled == true,
+        }, Icons.AutoMirrored.Outlined.VolumeUp, checked = state.buzzerAvailable != false &&
+                ((state.mode == RackMode.AUTO && state.buzzerAutoRequired == true) || state.buzzerEnabled == true),
             onChange = actions::setBuzzerEnabled,
-            enabled = state.mode == com.example.smartdryingrack.domain.model.RackMode.MANUAL && state.connection == com.example.smartdryingrack.domain.model.ConnectionState.ONLINE && state.buzzerEnabled != null && state.buzzerAvailable != false && !state.buzzerUpdating)
+            enabled = state.mode == RackMode.MANUAL && state.connection == ConnectionState.ONLINE && state.buzzerEnabled != null && state.buzzerAvailable != false && !state.buzzerUpdating)
         state.deviceMessage?.let { Text(it, color = AppColors.Warning, style = MaterialTheme.typography.bodySmall) }
         state.rainRaw?.let { Text("${if (online) "Rain sensor raw" else "Last rain sensor raw (stale)"}: $it · check dry/wet calibration",
             style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary) }
@@ -144,15 +134,15 @@ fun ControlScreen(state: ControlUiState, actions: ControlActions, onHouseLights:
             Text(stringResource(it.res()), color = AppColors.Warning, style = MaterialTheme.typography.bodyMedium)
         }
 
-        com.example.smartdryingrack.core.designsystem.NeonFeatureRow("Rain protection enabled",
-            "Confirmed rain requests retraction. Firmware safety remains independent.", androidx.compose.material.icons.Icons.Outlined.Umbrella)
+        NeonFeatureRow("Rain protection enabled",
+            "Confirmed rain requests retraction. Firmware safety remains independent.", Icons.Outlined.Umbrella)
         ScheduleCard(state, actions)
         Text("The emergency stop sends a Wi-Fi request. Use the physical stop if communication fails.",
             style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ScheduleCard(state: ControlUiState, actions: ControlActions) {
     var editing by remember { mutableStateOf<Boolean?>(null) }

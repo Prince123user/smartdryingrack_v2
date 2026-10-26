@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -50,7 +51,7 @@ fun OnboardingScreen(onFinish: () -> Unit, onConnect: () -> Unit) {
             PageDots(page + 1, 3)
             Spacer(Modifier.height(16.dp))
             if (page == 0) OutlinedButton(onClick = onConnect, modifier = Modifier.fillMaxWidth()) { Text("Skip") }
-            NeonAction(if (page == 0) "Next" else "Continue", Icons.Outlined.ArrowForward,
+            NeonAction(if (page == 0) "Next" else "Continue", Icons.AutoMirrored.Outlined.ArrowForward,
                 { if (page == 0) page = 1 else onConnect() }, modifier = Modifier.fillMaxWidth())
             if (page == 1) TextButton(onClick = onConnect) { Text("Skip") }
             Spacer(Modifier.height(24.dp))

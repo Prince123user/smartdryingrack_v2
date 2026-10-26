@@ -3,6 +3,7 @@ package com.example.smartdryingrack.feature.history
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ShowChart
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -70,7 +71,7 @@ fun TemperatureChart(points: List<TemperaturePoint>) {
         if (points.size < 2) {
             Column(Modifier.fillMaxWidth().padding(vertical = 24.dp), horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                NeonIcon(Icons.Outlined.ShowChart, modifier = Modifier.size(54.dp))
+                NeonIcon(Icons.AutoMirrored.Outlined.ShowChart, modifier = Modifier.size(54.dp))
                 Text("Waiting for temperature history", fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 Text("Connect your rack. The trend appears after two measurements, recorded five minutes apart.",

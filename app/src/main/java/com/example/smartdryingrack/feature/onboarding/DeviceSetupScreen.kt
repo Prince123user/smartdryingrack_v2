@@ -1,5 +1,6 @@
 package com.example.smartdryingrack.feature.onboarding
 
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -33,7 +34,7 @@ fun DeviceSetupScreen(onFinishSetup: () -> Unit, viewModel: DeviceViewModel = hi
             Text("ESP32 Rack is now online!", style = MaterialTheme.typography.titleMedium)
             com.example.smartdryingrack.core.designsystem.NeonFeatureRow("Wi-Fi REST connected", "Validated device telemetry received", androidx.compose.material.icons.Icons.Outlined.Wifi)
             com.example.smartdryingrack.core.designsystem.NeonFeatureRow("Local IP address", address, androidx.compose.material.icons.Icons.Outlined.Lan)
-            com.example.smartdryingrack.core.designsystem.NeonAction("Open Home", androidx.compose.material.icons.Icons.Outlined.ArrowForward,
+            com.example.smartdryingrack.core.designsystem.NeonAction("Open Home", androidx.compose.material.icons.Icons.AutoMirrored.Outlined.ArrowForward,
                 onFinishSetup, modifier = Modifier.fillMaxWidth())
         }
         return

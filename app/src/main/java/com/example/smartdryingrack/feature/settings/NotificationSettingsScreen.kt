@@ -1,5 +1,6 @@
 package com.example.smartdryingrack.feature.settings
 
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.*
@@ -26,7 +27,7 @@ fun NotificationSettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel 
             checked = true, enabled = false)
         NeonToggleRow("Clothes-dry alerts", "Notify when the measured dryness target is reached", androidx.compose.material.icons.Icons.Outlined.DryCleaning,
             checked = settings.clothesDryAlert, onChange = { enabled -> viewModel.update { it.copy(clothesDryAlert = enabled) } })
-        NeonToggleRow("Notification sound", "Sound notifications are unavailable", androidx.compose.material.icons.Icons.Outlined.VolumeUp,
+        NeonToggleRow("Notification sound", "Sound notifications are unavailable", androidx.compose.material.icons.Icons.AutoMirrored.Outlined.VolumeUp,
             checked = false, enabled = false)
     }
 }

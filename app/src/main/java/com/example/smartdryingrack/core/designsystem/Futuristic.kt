@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -114,7 +115,7 @@ fun NeonAction(label: String, icon: ImageVector, onClick: () -> Unit, enabled: B
         .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
         .padding(horizontal = 16.dp, vertical = 14.dp), contentAlignment = Alignment.Center) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            val trailing = icon == Icons.Outlined.ArrowForward
+            val trailing = icon == Icons.AutoMirrored.Outlined.ArrowForward
             if (!trailing) Icon(icon, contentDescription = null, tint = if (enabled) Color.White else AppColors.TextTertiary)
             Text(label, color = if (enabled) AppColors.TextPrimary else AppColors.TextTertiary, fontWeight = FontWeight.Bold)
             if (trailing) Icon(icon, contentDescription = null, tint = if (enabled) Color.White else AppColors.TextTertiary)

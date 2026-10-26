@@ -2,6 +2,7 @@ package com.example.smartdryingrack.feature.onboarding
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material3.*
@@ -31,7 +32,7 @@ fun GetStartedScreen(onGetStarted: () -> Unit, onHaveDevice: () -> Unit) {
             ReferenceArtwork(com.example.smartdryingrack.R.drawable.reference_intro, 720, 1450, Modifier.fillMaxWidth().weight(1f), "Illustration of a motorized drying rack with hanging laundry")
             PageDots(0, 3)
             Spacer(Modifier.height(18.dp))
-            NeonAction("Get Started", Icons.Outlined.ArrowForward, onGetStarted, modifier = Modifier.fillMaxWidth())
+            NeonAction("Get Started", Icons.AutoMirrored.Outlined.ArrowForward, onGetStarted, modifier = Modifier.fillMaxWidth())
             TextButton(onClick = onHaveDevice) { Text("I already have a device") }
             Spacer(Modifier.height(16.dp))
         }
