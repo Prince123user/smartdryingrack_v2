@@ -85,15 +85,15 @@ public:
   size_t putBool(const char* k,bool v){values[k]=v;return 1;}
 };
 
-inline std::map<int, int> pwmChannels, pwmDuty;
+inline std::map<int, int> pwmChannels, pwmDuty, pwmFrequencies;
 inline int failedPwmPin = -1;
 inline bool ledcAttachChannel(int pin,int frequency,int bits,int channel) {
-  (void)frequency;(void)bits; pwmChannels[pin]=channel;return pin!=failedPwmPin;
+  (void)bits; pwmChannels[pin]=channel;pwmFrequencies[pin]=frequency;return pin!=failedPwmPin;
 }
 inline bool ledcWrite(int pin,int duty){if(pin==failedPwmPin)return false;pwmDuty[pin]=duty;return true;}
 inline bool failedToneOutput=false;
-inline double ledcWriteTone(int pin,int hz){if(failedToneOutput && hz>0)return 0;pwmDuty[pin]=hz;if(hz)tones++;else stops++;return hz;}
+inline double ledcWriteTone(int pin,int hz){if(failedToneOutput && hz>0)return 0;if(hz){pwmFrequencies[pin]=hz;pwmDuty[pin]=511;tones++;}else{pwmDuty[pin]=0;stops++;}return hz;}
 inline uint32_t esp_random(){static uint32_t v=100;return ++v;}
 
 inline uint32_t ledcRead(int pin){return pwmDuty[pin];}
-inline uint32_t ledcReadFreq(int pin){return pwmChannels.count(pin)?1000:0;}
+inline uint32_t ledcReadFreq(int pin){return pwmFrequencies[pin];}

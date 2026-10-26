@@ -130,3 +130,11 @@ Validation: simulated extend/retract with both modes and both preferences, mode 
 ## Release 1.1.7 — compatibility verification and tone failure reporting
 
 Positive-frequency buzzer writes are checked. A failed write attempts to mute GPIO19, marks PWM unavailable, latches `buzzerToneFault`, and stops the pattern. The buzzer test/enable endpoint returns HTTP 503 for detected tone failure; a failed enable restores the previous manual preference. The app displays unavailable output instead of a working sound switch. Reboot/reinitialization is required after a latched tone fault. AUTO/MANUAL policy, RGB and other rack controls are retained. See `COMPATIBILITY_CHECK_1.1.7.md` for measured software results and remaining physical checks.
+
+## Release 1.1.8 — edit buzzer pitch and approximate loudness
+
+In Arduino IDE, search for `EDIT THESE SOUND SETTINGS` near the top of the sketch. The defaults preserve existing tones: `BUZZER_VOLUME_PERCENT=100`, retract 1800 Hz, extend 2400 Hz, startup/alert/test 2400 Hz. Edit the constants and upload again; no app change is required.
+
+For a lower-pitched retract, try `BUZZER_RETRACT_HZ=1200`. For a higher-pitched extend, try `BUZZER_EXTEND_HZ=3000`. Pitch settings accept 200..5000 Hz at compile time; the actual part's useful range depends on its specifications. `BUZZER_VOLUME_PERCENT` accepts 1..100 and sets a 10-bit PWM duty between approximately 0.5% and 50%, after each tone start. This may change loudness but is not calibrated volume and does not increase output voltage. A value of 50 does not mean half the measured sound level. Zero is excluded to preserve mandatory AUTO sound; mute MANUAL with the app switch.
+
+Both frequency configuration and the subsequent PWM duty write are checked; either failure latches the existing output fault. RGB, movement policy and APIs are retained. The diagnostics/config include the configured `buzzerVolumePercent`. Simulated tests verify pitch routing, duty scaling and write failures; actual acoustic response remains unverified. Do not use resistorless LEDs or an electrically unverified buzzer load while testing.

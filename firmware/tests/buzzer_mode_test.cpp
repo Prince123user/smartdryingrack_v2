@@ -11,7 +11,10 @@ int main() {
       stopBuzzer(); auto before=tones; beginMotion(retract);
       const bool audible=mode==MODE_AUTO || preference;
       assert(buzzerActive==audible && tones==before+(audible?1:0));
-      if(audible) assert(pwmDuty[19]==(retract?1800:2400));
+      if(audible) {
+        assert(ledcReadFreq(19)==(retract?BUZZER_RETRACT_HZ:BUZZER_EXTEND_HZ));
+        assert(ledcRead(19)==buzzerDutyForPercent(BUZZER_VOLUME_PERCENT));
+      }
       updateBuzzer(); assert(buzzerActive==audible);
     }
   }
