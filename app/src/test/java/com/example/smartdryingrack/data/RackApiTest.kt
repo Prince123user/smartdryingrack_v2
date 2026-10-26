@@ -12,6 +12,14 @@ import java.net.URL
 import java.net.HttpURLConnection
 
 class RackApiTest {
+    @Test fun autoBuzzerPolicyMustBeReportedAsBooleanAndIsNotAssumedForOlderFirmware() {
+        val json = org.json.JSONObject(status).put("buzzerAutoRequired", true)
+        assertEquals(true, parseRackSnapshot(json.toString(), 123L).buzzerAutoRequired)
+        json.remove("buzzerAutoRequired")
+        assertNull(parseRackSnapshot(json.toString(), 123L).buzzerAutoRequired)
+        json.put("buzzerAutoRequired", "true")
+        assertThrows(IllegalArgumentException::class.java) { parseRackSnapshot(json.toString(), 123L) }
+    }
     private val status = """{"state":"RETRACTED","firmwareVersion":"1.2.0","sensors":{"temperature":29.5,"humidity":64,"rainDetected":false,"clothesDryPercentage":null}}"""
 
     @Test fun onlyPrivateNetworksAllowPlainHttp() {

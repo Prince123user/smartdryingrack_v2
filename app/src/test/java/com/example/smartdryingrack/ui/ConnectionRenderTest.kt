@@ -29,6 +29,23 @@ class ConnectionRenderTest {
     private val connections = mutableListOf<String>()
     private var disconnected = false
     private var wifiOpened = false
+    @Test fun automaticBuzzerUsesReportedPolicyAndCannotBeMutedByTheManualSwitch() {
+        val actions = org.mockito.Mockito.mock(com.example.smartdryingrack.feature.control.ControlActions::class.java)
+        compose.runOnUiThread {
+            compose.activity.setContent {
+                SmartDryingRackTheme {
+                    com.example.smartdryingrack.feature.control.ControlScreen(
+                        com.example.smartdryingrack.feature.control.ControlUiState(
+                            connection = ConnectionState.ONLINE,
+                            mode = com.example.smartdryingrack.domain.model.RackMode.AUTO,
+                            buzzerEnabled = false, buzzerAutoRequired = true), actions)
+                }
+            }
+        }
+        compose.onNodeWithContentDescription("Buzzer").performScrollTo().assertIsOn().assertIsNotEnabled()
+        compose.onNodeWithText("AUTO · movement sound always on. Switch to MANUAL to choose sound.").assertExists()
+        org.mockito.Mockito.verifyNoInteractions(actions)
+    }
     private fun show(state: ConnectionState, largeText: Boolean = false, lastReading: Long? = null) {
         compose.runOnUiThread {
             compose.activity.setContent {

@@ -48,6 +48,8 @@ class WifiRackController internal constructor(
     private val settingsRequest = Mutex()
     private val _buzzerEnabled = MutableStateFlow<Boolean?>(null)
     val buzzerEnabled = _buzzerEnabled.asStateFlow()
+    private val _buzzerAutoRequired = MutableStateFlow<Boolean?>(null)
+    val buzzerAutoRequired = _buzzerAutoRequired.asStateFlow()
     private val _rainRaw = MutableStateFlow<Int?>(null)
     val rainRaw = _rainRaw.asStateFlow()
     private val _motionReason = MutableStateFlow<String?>(null)
@@ -103,6 +105,7 @@ class WifiRackController internal constructor(
                         _deviceMode.value = snapshot.mode
                         _stopLatched.value = snapshot.stopLatched
                         _buzzerEnabled.value = snapshot.buzzerEnabled
+                        _buzzerAutoRequired.value = snapshot.buzzerAutoRequired
                         _rainRaw.value = snapshot.rainRaw
                         _motionReason.value = snapshot.motionReason
                         _message.value = null
@@ -139,6 +142,7 @@ class WifiRackController internal constructor(
         _deviceMode.value = null
         _stopLatched.value = null
         _buzzerEnabled.value = null
+        _buzzerAutoRequired.value = null
         _rainRaw.value = null
         _motionReason.value = null
     }

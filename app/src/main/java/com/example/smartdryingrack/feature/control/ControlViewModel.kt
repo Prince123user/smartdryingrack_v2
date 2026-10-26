@@ -41,6 +41,7 @@ data class ControlUiState(
     val pendingMovement: RackState? = null,
     val buzzerEnabled: Boolean? = null,
     val buzzerUpdating: Boolean = false,
+    val buzzerAutoRequired: Boolean? = null,
     val deviceMessage: String? = null,
     val rainRaw: Int? = null,
     val motionReason: String? = null,
@@ -84,10 +85,11 @@ class ControlViewModel @Inject constructor(
 
     private val buzzerUpdating = MutableStateFlow(false)
     private val deviceMessage = MutableStateFlow<String?>(null)
-    private data class DeviceControls(val buzzer: Boolean?, val updating: Boolean, val message: String?, val raw: Int?, val reason: String?)
+    private data class DeviceControls(val buzzer: Boolean?, val updating: Boolean, val message: String?, val raw: Int?, val reason: String?, val autoRequired: Boolean?)
     private val settingsMessage = combine(deviceMessage, rack.modeMessage, controller.message) { local, mode, connection -> connection ?: mode ?: local }
-    private val deviceControls = combine(controller.buzzerEnabled, buzzerUpdating, settingsMessage, controller.rainRaw, controller.motionReason) { buzzer, updating, message, raw, reason ->
-        DeviceControls(buzzer, updating, message, raw, reason)
+    private val buzzerPolicy = combine(controller.buzzerEnabled, controller.buzzerAutoRequired) { enabled, auto -> enabled to auto }
+    private val deviceControls = combine(buzzerPolicy, buzzerUpdating, settingsMessage, controller.rainRaw, controller.motionReason) { buzzer, updating, message, raw, reason ->
+        DeviceControls(buzzer.first, updating, message, raw, reason, buzzer.second)
     }
     private val controls =
         combine(base, schedules.schedule, settings.settings, rejection, rack.pendingMovement) { b, sch, set, rej, pending ->
@@ -97,12 +99,12 @@ class ControlViewModel @Inject constructor(
                     retract = com.example.smartdryingrack.domain.model.Unavailable.MOVING))
         }
     val uiState: StateFlow<ControlUiState> = combine(controls, deviceControls) { state, device ->
-        state.copy(buzzerEnabled = device.buzzer, buzzerUpdating = device.updating, deviceMessage = device.message,
+        state.copy(buzzerEnabled = device.buzzer, buzzerAutoRequired = device.autoRequired, buzzerUpdating = device.updating, deviceMessage = device.message,
             rainRaw = device.raw, motionReason = device.reason)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ControlUiState())
 
     override fun setBuzzerEnabled(enabled: Boolean) {
-        if (buzzerUpdating.value) return
+        if (buzzerUpdating.value || rack.mode.value == RackMode.AUTO) return
         buzzerUpdating.value = true
         deviceMessage.value = null
         viewModelScope.launch {

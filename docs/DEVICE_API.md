@@ -81,3 +81,7 @@ Rain-triggered app retraction requires current, fresh wet telemetry and confirma
 The current firmware is based on the uploaded working sketch. See [firmware 1.1.1](ESP32_FIRMWARE.md) and [the implemented lighting API](LIGHTING_API.md) for its additive routes, volatile settings, stable-dry AUTO behavior and GPIO allocation.
 
 For the merged firmware, phone automation respects the device STOP latch and leaves rain protection to the device. Explicit STOP attempts are allowed during telemetry errors at the actively requested address, with normal acknowledgement/error handling; explicit Disconnect still prevents requests.
+
+### Buzzer mode policy (firmware 1.1.6)
+
+`buzzerEnabled` is the retained MANUAL preference, not the AUTO sound override. Healthy status adds optional boolean `buzzerAutoRequired` and boolean `buzzerEffectiveEnabled`. AUTO requires movement sound; MANUAL honors `buzzerEnabled`. Clients must not assume this policy for firmware omitting the capability. The app's AUTO switch is read-only; the existing POST `/api/buzzer` request/acknowledgement remains a manual preference update. These fields report configuration, not audible or electrical output verification.

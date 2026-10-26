@@ -29,7 +29,7 @@ fun normalizeRackUrl(value: String): String {
 }
 
 data class RackSnapshot(val state: RackState, val sensors: SensorData, val firmware: String?,
-                        val buzzerEnabled: Boolean? = null, val rainRaw: Int? = null, val motionReason: String? = null, val mode: RackMode? = null, val stopLatched: Boolean? = null)
+                        val buzzerEnabled: Boolean? = null, val rainRaw: Int? = null, val motionReason: String? = null, val mode: RackMode? = null, val stopLatched: Boolean? = null, val buzzerAutoRequired: Boolean? = null)
 
 fun parseRackSnapshot(body: String, receivedAt: Long): RackSnapshot {
     val json = JSONObject(body)
@@ -49,6 +49,8 @@ fun parseRackSnapshot(body: String, receivedAt: Long): RackSnapshot {
     require(data.isValid) { "The rack returned invalid sensor readings." }
     val buzzer = json.opt("buzzerEnabled").takeUnless { it == JSONObject.NULL }
     require(buzzer == null || buzzer is Boolean) { "Invalid buzzer setting." }
+    val autoBuzzer = json.opt("buzzerAutoRequired").takeUnless { it == JSONObject.NULL }
+    require(autoBuzzer == null || autoBuzzer is Boolean) { "Invalid automatic buzzer policy." }
     val raw = sensors.opt("rainRaw").takeUnless { it == JSONObject.NULL }
     require(raw == null || raw is Number && raw.toDouble() in 0.0..4095.0 && raw.toDouble() % 1.0 == 0.0) { "Invalid rain sensor reading." }
     val mode = json.opt("mode").takeUnless { it == JSONObject.NULL }
@@ -57,7 +59,7 @@ fun parseRackSnapshot(body: String, receivedAt: Long): RackSnapshot {
     require(stop == null || stop is Boolean) { "Invalid STOP latch." }
     return RackSnapshot(state, data, json.optString("firmwareVersion").takeIf { it.isNotBlank() },
         buzzer as Boolean?, (raw as Number?)?.toInt(), json.optString("motionReason").takeIf { it.isNotBlank() },
-        (mode as String?)?.let(RackMode::valueOf), stop as Boolean?)
+        (mode as String?)?.let(RackMode::valueOf), stop as Boolean?, autoBuzzer as Boolean?)
 }
 
 class RackHttpException(val statusCode: Int) : IOException("Rack returned HTTP $statusCode.")

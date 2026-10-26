@@ -116,3 +116,13 @@ Common cathode connects to GND. Red goes through its own resistor to GPIO26, gre
 Existing automatic mapping and priority remain: servo/sensor errors (yellow) override rain (red), then STOP (yellow), then Wi-Fi connecting (blue), pending rain (yellow), movement (cyan), extended/dry (green), and retracted idle (white). Unknown position is yellow. There are no app manual controls for RGB and house commands cannot target it. No new PWM channels are used for this digital RGB output. Rain, buzzer, rack and house-light polarity behavior are unchanged.
 
 Target compilation and host simulated-GPIO checks do not establish physical LED operation. Configure local Wi-Fi before uploading and verify the device reports firmware 1.1.5 with indicator state in `/api/lights`.
+
+## Release 1.1.6 — buzzer policy by mode
+
+Every accepted movement start requests a short beep: retract 1800 Hz / 350 ms, extend 2400 Hz / 350 ms. A higher-priority rain pattern already playing may take precedence. AUTO always permits sound regardless of the manual mute preference. MANUAL uses `buzzerEnabled` to allow or mute sound. STOP still cancels the current pattern. Startup keeps its two chirps. A failed PWM output or unsuitable electrical circuit can still prevent audible sound.
+
+`buzzerEnabled` remains the manual preference in existing GET/POST contracts, retained across mode changes in RAM (not persisted through reboot). Healthy `/api/status`, `/api/config`, and `/api/diagnostics` add `buzzerAutoRequired:true` and `buzzerEffectiveEnabled` (the current mode's sound permission, not measured audio). Old `/api/buzzer` acknowledgements still confirm the manual preference. Writing false while AUTO does not mute an active pattern; entering MANUAL with that preference stops it. The legacy `buzzerOnMovement` setting is accepted for compatibility but no longer suppresses movement beeps: the mode and `buzzerEnabled` define this policy.
+
+The matching app locks the switch ON in AUTO only when this capability is device-reported. In MANUAL it displays the retained preference and enables the existing acknowledged toggle. Older firmware gets an update message instead of a claimed automatic override. Update both firmware and app for the complete experience.
+
+Validation: simulated extend/retract with both modes and both preferences, mode transitions, legacy movement-flag override, STOP, API policy parsing, and AUTO switch lockout. Physical sound and the unidentified two-pin buzzer's drive requirements remain unverified. Keep resistorless house LEDs disconnected until suitable per-LED resistors are fitted.
