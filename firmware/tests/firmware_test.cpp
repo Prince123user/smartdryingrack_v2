@@ -19,7 +19,8 @@ int main(int argc, char** argv) {
   handleGetLights();auto initial=responseJson();
   if(argc>1){std::ofstream output(argv[1]);output<<server.response.value;assert(output.good());}
   assert(initial["schemaVersion"]==2 && initial["zones"].size()==6 && initial["lights"].size()==6);
-  assert(initial["indicator"].isNull() && !initial["statusIndicator"]["hardwareEnabled"].as<bool>());
+  assert(!initial["indicator"].isNull() && initial["statusIndicator"]["hardwareEnabled"].as<bool>());
+  assert(initial["indicator"]["mode"] == "AUTOMATIC" && STATUS_RGB_ENABLED && !STATUS_RGB_COMMON_ANODE);
   assert(initial["deviceSession"].as<std::string>().size()==32);
   for(int i=0;i<6;i++){
     requestLight(i,("zone-"+std::to_string(i)).c_str(),true,10+i,0);

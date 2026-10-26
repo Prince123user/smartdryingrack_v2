@@ -44,7 +44,8 @@ inline int fakeADC=3300, fakeDigital=HIGH, tones=0, stops=0;
 inline unsigned long millis(){return fakeNow;}
 inline void delay(unsigned long n){fakeNow+=n;}
 inline void pinMode(int,int){}
-inline void digitalWrite(int,int){}
+inline std::map<int,int> digitalLevels;
+inline void digitalWrite(int pin,int level){digitalLevels[pin]=level;}
 inline void analogReadResolution(int){}
 inline void analogSetPinAttenuation(int,int){}
 inline std::vector<int> adcSamples;

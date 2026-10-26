@@ -13,6 +13,7 @@ int main() {
       std::array<int, 6> duties;
       for (unsigned j = 0; j < 6; ++j) { before[j] = houseLights[j]; duties[j] = pwmDuty[HOUSE_LIGHT_PINS[j]]; }
       const auto started = fakeNow;
+      const auto oldRed = statusRed, oldGreen = statusGreen, oldBlue = statusBlue;
       JsonDocument body;
       body["requestId"] = std::string("matrix-") + std::to_string(zone) + "-" + std::to_string(step++);
       body["deviceSession"] = lightingSession;
@@ -30,7 +31,7 @@ int main() {
         assert(houseLights[j].revision == before[j].revision && houseLights[j].lastRequestId == before[j].lastRequestId);
         assert(houseLights[j].available == before[j].available && pwmDuty[HOUSE_LIGHT_PINS[j]] == duties[j]);
       }
-      assert(!STATUS_RGB_ENABLED && statusRed == 0 && statusGreen == 0 && statusBlue == 255);
+      assert(STATUS_RGB_ENABLED && statusRed == oldRed && statusGreen == oldGreen && statusBlue == oldBlue);
     };
     command(true, 73);
     command(false, 73); // OFF retains selected brightness.

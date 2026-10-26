@@ -44,9 +44,9 @@ Each bare LED needs its own current limiting: `R >= (supply_max - LED_Vf_min - d
 
 Firmware drives house outputs low/OFF at startup and retains 100% selected brightness in RAM. Gate pull-downs or an appropriate driver enable/default-OFF arrangement are needed so loads stay OFF during reset, before firmware configures pins. Validate ESP32-only reset and brownout behavior on the real circuit.
 
-## RGB is disabled until identified
+## RGB enabled in release 1.1.5 (common cathode)
 
-The uploaded optional implementation is specifically for a plain four-pin RGB LED with per-channel current limiting. Reserved signals are R GPIO26, G GPIO32, B GPIO33. It uses digital ON/OFF color channels, not PWM dimming. `STATUS_RGB_ENABLED=false` must remain unchanged until the part/pinout and circuit are confirmed.
+The uploaded optional implementation is specifically for a plain four-pin RGB LED with per-channel current limiting. Reserved signals are R GPIO26, G GPIO32, B GPIO33. It uses digital ON/OFF color channels, not PWM dimming. `STATUS_RGB_ENABLED=true` and `STATUS_RGB_COMMON_ANODE=false` now follow the user-supplied common-cathode diagram. Connect the shared cathode to GND and use a separate resistor on each color path. This configuration is requested by the user; actual component pin order and physical operation remain unverified. Set the enable flag false again if the actual component does not match.
 
 Common-cathode, common-anode, addressable WS2812-style and two-wire cycling LEDs are not interchangeable. The optional common-anode direct-signal code is limited to a 3.3 V common connection, never 5 V at a GPIO. Higher voltage/current parts need suitable separate drivers and potentially different polarity. Do not wire or enable these outputs based on colors alone. The app shows “RGB output disabled in firmware” when `statusIndicator.hardwareEnabled` is explicitly false. It does not display the logical desired colors as physical output. Cached configuration is marked last reported when disconnected.
 
